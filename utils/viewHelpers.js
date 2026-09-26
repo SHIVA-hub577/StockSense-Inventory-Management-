@@ -36,18 +36,19 @@ const OPERATION_META = {
 
 const SLUG_TO_TYPE = Object.fromEntries(Object.entries(OPERATION_META).map(([type, m]) => [m.slug, type]));
 
+// Status pills use the design system badges (styles/app.css)
 const STATUS_META = {
-  draft: { label: 'Draft', classes: 'bg-slate-500/10 text-slate-300 border-slate-500/30' },
-  waiting: { label: 'Waiting', classes: 'bg-amber-500/10 text-amber-400 border-amber-500/30' },
-  ready: { label: 'Ready', classes: 'bg-blue-500/10 text-blue-400 border-blue-500/30' },
-  done: { label: 'Done', classes: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' },
-  canceled: { label: 'Canceled', classes: 'bg-red-500/10 text-red-400 border-red-500/30' },
+  draft: { label: 'Draft', classes: 'badge-neutral' },
+  waiting: { label: 'Waiting', classes: 'badge-warn' },
+  ready: { label: 'Ready', classes: 'badge-info' },
+  done: { label: 'Done', classes: 'badge-ok' },
+  canceled: { label: 'Canceled', classes: 'badge-bad' },
 };
 
 const STOCK_STATUS_META = {
-  ok: { label: 'In stock', classes: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' },
-  low: { label: 'Low stock', classes: 'bg-amber-500/10 text-amber-400 border-amber-500/30' },
-  out: { label: 'Out of stock', classes: 'bg-red-500/10 text-red-400 border-red-500/30' },
+  ok: { label: 'In stock', classes: 'badge-ok' },
+  low: { label: 'Low stock', classes: 'badge-warn' },
+  out: { label: 'Out of stock', classes: 'badge-bad' },
 };
 
 const OPEN_STATUSES = ['draft', 'waiting', 'ready'];
@@ -63,11 +64,11 @@ const REASON_META = {
 
 // Forecast outlook (services/insightsService.js)
 const OUTLOOK_META = {
-  out: { label: 'Out of stock', classes: 'bg-red-500/10 text-red-400 border-red-500/30' },
-  critical: { label: 'Order now', classes: 'bg-red-500/10 text-red-300 border-red-500/30' },
-  soon: { label: 'Runs out soon', classes: 'bg-amber-500/10 text-amber-400 border-amber-500/30' },
-  low: { label: 'Low stock', classes: 'bg-amber-500/10 text-amber-400 border-amber-500/30' },
-  ok: { label: 'Healthy', classes: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' },
+  out: { label: 'Out of stock', classes: 'badge-bad' },
+  critical: { label: 'Order now', classes: 'badge-bad' },
+  soon: { label: 'Runs out soon', classes: 'badge-warn' },
+  low: { label: 'Low stock', classes: 'badge-warn' },
+  ok: { label: 'Healthy', classes: 'badge-ok' },
 };
 
 // ₹ amounts (whole rupees above 1,000)
@@ -189,6 +190,20 @@ const ICONS = {
   check: 'M4.5 12.75l6 6 9-13.5',
   archive: 'M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z',
   menu: 'M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5',
+  sun: 'M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z',
+  moon: 'M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z',
+  monitor: 'M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25',
+  chevron: 'M19.5 8.25l-7.5 7.5-7.5-7.5',
+  chevronRight: 'M8.25 4.5l7.5 7.5-7.5 7.5',
+  x: 'M6 18L18 6M6 6l12 12',
+  user: 'M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z',
+  box: 'M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z',
+  bolt: 'M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z',
+  info: 'M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z',
+  sparkles: 'M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z',
+  map: 'M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z',
+  swatch: 'M4.098 19.902a3.75 3.75 0 005.304 0l6.401-6.402M6.75 21A3.75 3.75 0 013 17.25V4.125C3 3.504 3.504 3 4.125 3h5.25c.621 0 1.125.504 1.125 1.125v4.072M6.75 21a3.75 3.75 0 003.75-3.75V8.197M6.75 21h13.125c.621 0 1.125-.504 1.125-1.125v-5.25c0-.621-.504-1.125-1.125-1.125h-4.072M10.5 8.197l2.88-2.88c.438-.439 1.15-.439 1.59 0l3.712 3.713c.44.44.44 1.152 0 1.59l-2.879 2.88M6.75 17.25h.008v.008H6.75v-.008z',
+  arrowRight: 'M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3',
   bell: 'M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0',
   scan: 'M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z M6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75zM13.5 19.5h.75v.75h-.75v-.75zM19.5 13.5h.75v.75h-.75v-.75zM19.5 19.5h.75v.75h-.75v-.75zM16.5 16.5h.75v.75h-.75v-.75z',
   timemachine: 'M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z',
@@ -199,7 +214,7 @@ const ICONS = {
 
 // Inline SVG for a named icon (static markup only - safe for <%- %>)
 const icon = (name, classes = 'w-5 h-5') =>
-  `<svg class="${classes}" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="${ICONS[name] || ''}"/></svg>`;
+  `<svg class="${classes}" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="${ICONS[name] || ''}"/></svg>`;
 
 // Suggested quantity for a replenishment receipt
 const reorderSuggestion = (product) => {
@@ -237,5 +252,6 @@ module.exports = {
   buildQuery,
   initials,
   icon,
+  iconPaths: ICONS,
   reorderSuggestion,
 };

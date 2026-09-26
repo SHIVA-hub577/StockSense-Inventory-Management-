@@ -1,46 +1,58 @@
 <%- include('../layout/app-top') %>
 <% const isManager = user.role === 'manager'; %>
 
-<div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+<header class="flex flex-col sm:flex-row sm:items-end justify-between gap-4" data-reveal>
   <div>
-    <h1 class="text-2xl font-bold text-white tracking-tight">Warehouses &amp; locations</h1>
-    <p class="text-sm text-slate-400 mt-1">Each warehouse has locations (racks, bins, zones) that hold stock. The warehouse code prefixes every document, e.g. <span class="font-mono">WH/IN/0001</span>.</p>
+    <p class="eyebrow">Settings</p>
+    <h1 class="page-title mt-1">Warehouses &amp; locations</h1>
+    <p class="text-sm text-muted mt-1.5 max-w-2xl">Each warehouse has locations (racks, bins, zones) that hold stock. The warehouse code prefixes every document, e.g. <span class="sku">WH/IN/0001</span>.</p>
   </div>
-</div>
+</header>
 
 <% if (isManager) { %>
-  <form id="newWarehouse" class="card p-4 grid md:grid-cols-4 gap-3" novalidate aria-label="New warehouse">
+  <form id="newWarehouse" class="card p-3 grid md:grid-cols-[1.2fr_0.6fr_1.4fr_auto] gap-2" novalidate aria-label="New warehouse" data-reveal>
     <input name="name" class="input" placeholder="Warehouse name" maxlength="80" required aria-label="Warehouse name">
     <input name="code" class="input font-mono uppercase" placeholder="Code, e.g. WH3" maxlength="5" required aria-label="Warehouse code">
     <input name="address" class="input" placeholder="Address (optional)" maxlength="200" aria-label="Address">
-    <button type="submit" class="btn btn-primary"><%- icon('plus', 'w-4 h-4') %> Add warehouse</button>
+    <button type="submit" class="btn btn-accent"><%- icon('plus', 'w-4 h-4') %> Add warehouse</button>
   </form>
 <% } %>
 
 <div class="grid xl:grid-cols-2 gap-6">
-  <% warehouses.forEach((w) => { %>
-    <section class="card overflow-hidden" data-warehouse="<%= w._id %>">
-      <div class="flex flex-wrap items-start justify-between gap-3 px-4 py-4 border-b border-slate-800">
-        <div>
-          <h2 class="text-lg font-semibold text-white"><%= w.name %> <span class="ml-1 font-mono text-sm text-blue-300"><%= w.code %></span></h2>
-          <p class="text-xs text-slate-500"><%= w.address || 'No address' %> · <%= w.locations.filter((l) => l.isActive).length %> locations · <%= fmtMoney(w.value) %> in stock</p>
+  <% warehouses.forEach((w) => { const active = w.locations.filter((l) => l.isActive); %>
+    <section class="card overflow-hidden" data-warehouse="<%= w._id %>" data-reveal>
+      <div class="flex flex-wrap items-start justify-between gap-3 px-5 py-4 border-b border-line">
+        <div class="flex items-center gap-3">
+          <span class="tile w-11 h-11 rounded-xl bg-ink text-canvas"><%- icon('warehouses', 'w-5 h-5') %></span>
+          <div>
+            <h2 class="text-lg font-bold leading-tight"><%= w.name %> <span class="ml-1 sku align-middle"><%= w.code %></span></h2>
+            <p class="text-xs text-muted mt-0.5"><%= w.address || 'No address' %> · <%= active.length %> locations · <span class="font-mono font-semibold text-ink"><%= fmtMoney(w.value) %></span> in stock</p>
+          </div>
         </div>
-        <div class="flex gap-2">
-          <a href="/labels?warehouse=<%= w._id %>" target="_blank" rel="noopener" class="btn btn-secondary btn-sm"><%- icon('printer', 'w-4 h-4') %> Bin labels</a>
+        <a href="/labels?warehouse=<%= w._id %>" target="_blank" rel="noopener" class="btn btn-secondary btn-sm"><%- icon('printer', 'w-4 h-4') %> Bin labels</a>
+      </div>
+
+      <!-- Floor plan -->
+      <div class="floor border-b border-line px-4 pt-4 pb-2">
+        <%- include('../partials/iso-floor', { w }) %>
+        <div class="flex items-center justify-between gap-3 pt-2 text-[0.7rem] text-muted">
+          <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-accent"></span> Taller stack = more stock value</span>
+          <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm border border-line-2 bg-surface"></span> Empty</span>
         </div>
       </div>
-      <table class="min-w-full">
-        <thead class="bg-slate-900/80"><tr><th class="th">Location</th><th class="th text-right">Products</th><th class="th text-right">Value</th><% if (isManager) { %><th class="th"><span class="sr-only">Actions</span></th><% } %></tr></thead>
+
+      <table class="table table-hover">
+        <thead><tr><th class="th">Location</th><th class="th text-right">Products</th><th class="th text-right">Value</th><% if (isManager) { %><th class="th"><span class="sr-only">Actions</span></th><% } %></tr></thead>
         <tbody>
           <% w.locations.forEach((l) => { %>
-            <tr class="border-t border-slate-800 <%= l.isActive ? '' : 'opacity-50' %>" data-location="<%= l._id %>">
+            <tr class="<%= l.isActive ? '' : 'opacity-50' %>" data-location="<%= l._id %>">
               <td class="td">
-                <a href="/locations/<%= l._id %>" class="font-medium text-white hover:text-blue-300" data-view><%= l.fullName %></a>
-                <% if (!l.isActive) { %><span class="badge bg-slate-500/10 text-slate-400 border-slate-500/30 ml-1">Archived</span><% } %>
-                <input data-edit class="input hidden" value="<%= l.name %>" maxlength="60" aria-label="Location name">
+                <a href="/locations/<%= l._id %>" class="font-mono text-[0.8125rem] font-semibold hover:text-accent-text" data-view><%= l.fullName %></a>
+                <% if (!l.isActive) { %><span class="badge badge-neutral ml-1">Archived</span><% } %>
+                <input data-edit class="input input-sm hidden" value="<%= l.name %>" maxlength="60" aria-label="Location name">
               </td>
-              <td class="td text-right tabular-nums text-slate-300"><%= l.products %></td>
-              <td class="td text-right tabular-nums text-slate-400"><%= l.value ? fmtMoney(l.value) : '—' %></td>
+              <td class="td text-right font-mono tabular"><%= l.products %></td>
+              <td class="td text-right font-mono tabular text-muted"><%= l.value ? fmtMoney(l.value) : '—' %></td>
               <% if (isManager) { %>
                 <td class="td text-right whitespace-nowrap">
                   <span data-view>
@@ -59,9 +71,9 @@
         </tbody>
       </table>
       <% if (isManager) { %>
-        <form class="flex gap-2 px-4 py-3 border-t border-slate-800" data-new-location novalidate>
-          <input name="name" class="input" placeholder="New location, e.g. Rack C" maxlength="60" aria-label="New location name">
-          <button type="submit" class="btn btn-secondary">Add</button>
+        <form class="flex gap-2 px-4 py-3 border-t border-line bg-surface-2" data-new-location novalidate>
+          <input name="name" class="input input-sm" placeholder="New location, e.g. Rack C" maxlength="60" aria-label="New location name">
+          <button type="submit" class="btn btn-secondary btn-sm h-9"><%- icon('plus', 'w-4 h-4') %> Add</button>
         </form>
       <% } %>
     </section>

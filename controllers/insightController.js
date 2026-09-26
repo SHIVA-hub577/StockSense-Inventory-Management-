@@ -97,11 +97,13 @@ const timeMachinePage = async (req, res) => {
     lookups.getWarehouses(),
     lookups.getCategories(),
   ]);
+  const activity = await insights.dailyActivity(result.firstDate);
   res.render('insights/time-machine', {
     title: 'Time Machine - StockSense',
     activeNav: 'timemachine',
     filters,
     ...result,
+    activity,
     warehouses,
     categories,
   });

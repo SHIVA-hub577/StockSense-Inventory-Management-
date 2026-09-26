@@ -1,0 +1,48 @@
+<%#
+  Illustrated empty state.
+  Locals: art ('crate' | 'search' | 'truck' | 'clipboard' | 'bins'), title, text (optional),
+          action (optional HTML, e.g. a button), compact (optional)
+%>
+<% const kind = typeof art !== 'undefined' ? art : 'crate'; %>
+<div class="empty <%= typeof compact !== 'undefined' && compact ? '!py-8' : '' %>" data-empty="<%= kind %>">
+  <svg class="empty-art" viewBox="0 0 140 90" fill="none" aria-hidden="true" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <ellipse cx="70" cy="82" rx="52" ry="4.5" style="fill: var(--sunken)" stroke="none"/>
+    <% if (kind === 'truck') { %>
+      <g data-empty-truck>
+        <path d="M18 34h58v36H18z" style="fill: var(--surface)"/>
+        <path d="M76 44h20l12 13v13H76z" style="fill: var(--surface)"/>
+        <path d="M82 49h11l7 8H82z" style="fill: var(--sunken)"/>
+        <circle cx="36" cy="72" r="7" style="fill: var(--surface)"/><circle cx="36" cy="72" r="2.5"/>
+        <circle cx="94" cy="72" r="7" style="fill: var(--surface)"/><circle cx="94" cy="72" r="2.5"/>
+        <rect x="28" y="44" width="22" height="8" rx="1.5" style="fill: var(--accent)" stroke="none"/>
+      </g>
+      <path d="M112 70h14M118 63h10" stroke-dasharray="3 4" opacity=".7"/>
+    <% } else if (kind === 'search') { %>
+      <path d="M26 44h34v26H26zM26 44l6-8h34l-6 8M60 44l6-8v26l-6 8" style="fill: var(--surface)"/>
+      <path d="M68 52h30v18H68z" style="fill: var(--surface)"/>
+      <circle cx="94" cy="36" r="15" style="fill: var(--canvas)"/>
+      <path d="M105 47l12 12" stroke-width="4"/>
+      <path d="M88 32a7 7 0 0 1 8-3" opacity=".6"/>
+      <rect x="36" y="52" width="14" height="5" rx="1" style="fill: var(--accent)" stroke="none"/>
+    <% } else if (kind === 'clipboard') { %>
+      <rect x="44" y="16" width="52" height="62" rx="5" style="fill: var(--surface)"/>
+      <rect x="58" y="11" width="24" height="10" rx="3" style="fill: var(--accent)" stroke="none"/>
+      <path d="M54 36h8M68 36h20M54 48h8M68 48h16M54 60h8M68 60h12"/>
+      <path d="M53 35l2 2 4-4" style="stroke: var(--ok)"/>
+    <% } else if (kind === 'bins') { %>
+      <path d="M22 18v62M118 18v62M22 40h96M22 62h96"/>
+      <rect x="30" y="26" width="18" height="14" rx="1.5" style="fill: var(--surface)"/>
+      <rect x="84" y="48" width="24" height="14" rx="1.5" style="fill: var(--surface)"/>
+      <rect x="54" y="30" width="10" height="10" rx="1.5" style="fill: var(--accent)" stroke="none"/>
+    <% } else { %>
+      <rect x="28" y="66" width="84" height="7" rx="1.5" style="fill: var(--surface)"/>
+      <path d="M36 73v6M70 73v6M104 73v6"/>
+      <path d="M44 38h52v28H44z" style="fill: var(--surface)"/>
+      <path d="M44 38l-9-11h52l9 11M96 38l9-11" style="fill: var(--sunken)"/>
+      <rect x="61" y="46" width="18" height="7" rx="1.2" style="fill: var(--accent)" stroke="none"/>
+    <% } %>
+  </svg>
+  <p class="text-base font-semibold text-ink"><%= title %></p>
+  <% if (typeof text !== 'undefined' && text) { %><p class="max-w-sm text-sm text-muted"><%= text %></p><% } %>
+  <% if (typeof action !== 'undefined' && action) { %><div class="mt-2 flex flex-wrap justify-center gap-2"><%- action %></div><% } %>
+</div>

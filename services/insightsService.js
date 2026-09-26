@@ -310,6 +310,27 @@ const stockAsOf = async ({ date, warehouse, category, search } = {}) => {
 };
 
 /**
+ * Number of stock moves per day from `from` to today (days without moves = 0),
+ * in the server's time zone. Feeds the Time Machine scrubber histogram.
+ */
+const dailyActivity = async (from) => {
+  const start = startOfDay(from);
+  const today = startOfDay();
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  const rows = await StockMove.aggregate([
+    { $match: { date: { $gte: start } } },
+    { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$date', timezone } }, moves: { $sum: 1 } } },
+  ]);
+  const counts = new Map(rows.map((r) => [r._id, r.moves]));
+  const key = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const days = [];
+  for (let d = new Date(start); d <= today; d = addDays(d, 1)) {
+    days.push({ day: key(d), moves: counts.get(key(d)) || 0 });
+  }
+  return days;
+};
+
+/**
  * Where a replenishment for a product should arrive: the location that holds
  * most of it, else the first "Stock" location, else any internal location.
  */
@@ -439,6 +460,7 @@ module.exports = {
   forecastsFor,
   productTimeline,
   stockAsOf,
+  dailyActivity,
   replenishmentPlan,
   createReplenishment,
   internalLocationIds,

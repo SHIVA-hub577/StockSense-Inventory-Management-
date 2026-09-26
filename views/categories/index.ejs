@@ -1,26 +1,27 @@
 <%- include('../layout/app-top') %>
-<% const isManager = user.role === 'manager'; %>
+<% const isManager = user.role === 'manager'; const maxCount = Math.max(1, uncategorised, ...categories.map((c) => c.productCount)); %>
 
-<div>
-  <h1 class="text-2xl font-bold text-white tracking-tight">Categories</h1>
-  <p class="text-sm text-slate-400 mt-1">Group products for filtering and reporting.</p>
-</div>
+<header data-reveal>
+  <p class="eyebrow">Inventory</p>
+  <h1 class="page-title mt-1">Categories</h1>
+  <p class="text-sm text-muted mt-1.5">Group products for filtering and reporting.</p>
+</header>
 
 <% if (isManager) { %>
-  <form id="addCategory" class="card p-4 flex flex-col md:flex-row gap-3" novalidate>
+  <form id="addCategory" class="card p-3 flex flex-col md:flex-row gap-2" novalidate data-reveal>
     <input name="name" class="input md:w-64" placeholder="New category name" maxlength="60" required aria-label="Category name">
     <input name="description" class="input flex-1" placeholder="Description (optional)" maxlength="200" aria-label="Category description">
-    <button type="submit" class="btn btn-primary"><%- icon('plus', 'w-4 h-4') %> Add category</button>
+    <button type="submit" class="btn btn-accent"><%- icon('plus', 'w-4 h-4') %> Add category</button>
   </form>
 <% } %>
 
-<div class="card overflow-hidden">
+<div class="card overflow-hidden" data-reveal>
   <% if (categories.length === 0) { %>
-    <p class="p-10 text-center text-slate-400">No categories yet.</p>
+    <%- include('../partials/empty', { art: 'crate', title: 'No categories yet', text: 'Create one to group similar products together.' }) %>
   <% } else { %>
     <div class="overflow-x-auto">
-      <table class="min-w-full">
-        <thead class="bg-slate-900/80">
+      <table class="table table-hover">
+        <thead>
           <tr>
             <th class="th">Name</th>
             <th class="th">Description</th>
@@ -30,22 +31,25 @@
         </thead>
         <tbody>
           <% categories.forEach((c) => { %>
-            <tr class="border-t border-slate-800" data-category-id="<%= c._id %>">
+            <tr data-category-id="<%= c._id %>">
               <td class="td">
-                <span data-view class="font-semibold text-white"><%= c.name %></span>
-                <input data-edit name="name" class="input hidden" value="<%= c.name %>" maxlength="60" aria-label="Category name">
+                <span data-view class="flex items-center gap-2.5 font-semibold"><span class="tile w-7 h-7 rounded-lg"><%- icon('categories', 'w-3.5 h-3.5') %></span><%= c.name %></span>
+                <input data-edit name="name" class="input input-sm hidden" value="<%= c.name %>" maxlength="60" aria-label="Category name">
               </td>
-              <td class="td text-slate-400">
+              <td class="td text-muted">
                 <span data-view><%= c.description || '—' %></span>
-                <input data-edit name="description" class="input hidden" value="<%= c.description || '' %>" maxlength="200" aria-label="Category description">
+                <input data-edit name="description" class="input input-sm hidden" value="<%= c.description || '' %>" maxlength="200" aria-label="Category description">
               </td>
               <td class="td text-right">
-                <a href="/products?category=<%= c._id %>" class="text-blue-300 hover:text-blue-200 tabular-nums"><%= c.productCount %></a>
+                <a href="/products?category=<%= c._id %>" class="inline-flex items-center justify-end gap-2.5 font-mono font-semibold tabular hover:text-accent-text">
+                  <span class="hidden sm:block h-1.5 w-20 rounded-full bg-sunken overflow-hidden" aria-hidden="true"><span class="block h-full rounded-full bg-accent" style="width: <%= ((c.productCount / maxCount) * 100).toFixed(1) %>%"></span></span>
+                  <%= c.productCount %>
+                </a>
               </td>
               <% if (isManager) { %>
                 <td class="td text-right whitespace-nowrap">
                   <span data-view>
-                    <button type="button" class="btn btn-secondary btn-sm" data-action="edit">Edit</button>
+                    <button type="button" class="btn btn-secondary btn-sm" data-action="edit"><%- icon('pencil', 'w-3.5 h-3.5') %> Edit</button>
                     <button type="button" class="btn btn-danger btn-sm" data-action="delete" data-name="<%= c.name %>">Delete</button>
                   </span>
                   <span data-edit class="hidden">
@@ -57,10 +61,10 @@
             </tr>
           <% }) %>
           <% if (uncategorised > 0) { %>
-            <tr class="border-t border-slate-800">
-              <td class="td italic text-slate-500">No category</td>
-              <td class="td text-slate-500">Products without a category</td>
-              <td class="td text-right tabular-nums text-slate-400"><%= uncategorised %></td>
+            <tr>
+              <td class="td italic text-muted">No category</td>
+              <td class="td text-muted">Products without a category</td>
+              <td class="td text-right font-mono tabular text-muted"><%= uncategorised %></td>
               <% if (isManager) { %><td class="td"></td><% } %>
             </tr>
           <% } %>

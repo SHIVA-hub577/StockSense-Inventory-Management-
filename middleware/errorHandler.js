@@ -50,6 +50,7 @@ const errorHandler = (err, req, res, next) => {
     const titles = { 400: 'Bad Request', 403: 'Access Denied', 404: 'Page Not Found' };
     return res.status(statusCode).render('error', {
       title: titles[statusCode] || 'Something Went Wrong',
+      statusCode,
       message: statusCode === 404 && !err.statusCode ? 'The page you are looking for does not exist.' : message,
       user: req.user || null,
     });

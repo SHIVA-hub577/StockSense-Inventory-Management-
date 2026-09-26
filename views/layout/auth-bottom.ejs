@@ -1,0 +1,46 @@
+      </div>
+    </main>
+    <footer class="text-xs text-muted">StockSense &copy; <%= new Date().getFullYear() %> · Role-based inventory &amp; warehouse management</footer>
+  </div>
+
+  <!-- Brand panel: a conveyor moving cartons through a scanner arch -->
+  <aside class="hidden lg:flex relative overflow-hidden flex-col justify-between bg-[#15171b] text-[#f1f0ec] p-12 xl:p-16" aria-hidden="true">
+    <div class="absolute inset-0 auth-floor"></div>
+    <div class="absolute -top-32 -right-32 w-[28rem] h-[28rem] rounded-full bg-[#ffb020] opacity-[0.13] blur-3xl"></div>
+    <div class="relative">
+      <p class="text-xs font-semibold uppercase tracking-[0.18em] text-[#ffc24d]">Dockside</p>
+      <p class="mt-4 max-w-md font-display text-[2.6rem] xl:text-5xl font-bold leading-[1.02] tracking-[-0.04em]">The warehouse, finally in sync.</p>
+    </div>
+    <svg class="relative w-full h-auto conveyor" viewBox="0 0 520 250" fill="none">
+      <!-- belt -->
+      <rect x="10" y="170" width="500" height="20" rx="10" fill="#2a2e35"/>
+      <g class="belt-lines" stroke="#3b414b" stroke-width="3">
+        <% for (let i = 0; i < 26; i++) { %><line x1="<%= 20 + i * 20 %>" y1="173" x2="<%= 12 + i * 20 %>" y2="187"/><% } %>
+      </g>
+      <% [40, 260, 480].forEach((x) => { %><rect x="<%= x - 4 %>" y="190" width="8" height="46" fill="#2a2e35"/><% }) %>
+      <!-- cartons riding the belt -->
+      <g class="belt-boxes">
+        <% [0, 1, 2, 3].forEach((i) => { %>
+          <g class="belt-box" style="--i: <%= i %>">
+            <rect x="0" y="126" width="54" height="44" rx="3" fill="#d8a863" stroke="#8a5d22" stroke-width="2"/>
+            <rect x="22" y="127" width="10" height="42" fill="#f3d9a4"/>
+            <rect x="6" y="150" width="14" height="10" rx="1" fill="#fff"/>
+          </g>
+        <% }) %>
+      </g>
+      <!-- scanner arch -->
+      <path d="M232 170 V70 H312 V170" stroke="#ffb020" stroke-width="10" stroke-linejoin="round"/>
+      <rect x="244" y="78" width="56" height="10" rx="5" fill="#ffb020" opacity=".35"/>
+      <rect class="arch-laser" x="238" y="96" width="68" height="3" rx="1.5" fill="#ff3b3b"/>
+      <circle cx="272" cy="58" r="7" fill="#3dd68c" class="arch-light"/>
+    </svg>
+    <ul class="relative grid gap-3 text-sm text-[#c9cbcf]">
+      <li class="flex items-center gap-3"><span class="w-6 h-6 rounded-lg bg-[#ffb020] text-[#1a1300] flex items-center justify-center font-bold text-xs">1</span> Receive, store, pick, pack and ship on one live ledger</li>
+      <li class="flex items-center gap-3"><span class="w-6 h-6 rounded-lg bg-[#ffb020] text-[#1a1300] flex items-center justify-center font-bold text-xs">2</span> Scan with a USB gun or your phone camera</li>
+      <li class="flex items-center gap-3"><span class="w-6 h-6 rounded-lg bg-[#ffb020] text-[#1a1300] flex items-center justify-center font-bold text-xs">3</span> Forecasts tell you what to reorder, and when</li>
+    </ul>
+  </aside>
+</div>
+<div id="toast-root" class="fixed z-[70] bottom-5 right-3 sm:right-5 w-[22rem] max-w-[calc(100vw-1.5rem)] flex flex-col gap-2" aria-live="polite"></div>
+</body>
+</html>

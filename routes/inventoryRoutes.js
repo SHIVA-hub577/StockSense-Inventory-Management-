@@ -45,5 +45,6 @@ router.get('/settings/warehouses', page, warehouses.settingsPage);
 router.get('/locations/:id', page, warehouses.locationPage);
 router.get('/scan', page, live.scanPage);
 router.get('/labels', protect, live.labelsPage);
+router.get('/styleguide', page, live.styleguidePage);
 
 module.exports = router;

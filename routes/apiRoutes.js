@@ -88,5 +88,6 @@ router.get('/nav-counts', live.navCounts);
 router.get('/alerts', live.alerts);
 router.post('/alerts/read-all', live.alertsReadAll);
 router.get('/scan/resolve', live.resolve);
+router.get('/search', live.searchAll);
 
 module.exports = router;

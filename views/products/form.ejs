@@ -1,117 +1,143 @@
 <%- include('../layout/app-top') %>
 <% const isEdit = Boolean(product); const p = product || {}; %>
 
-<nav class="text-sm text-slate-500" aria-label="Breadcrumb">
-  <a href="/products" class="hover:text-slate-300">Products</a> <span class="mx-1">/</span>
-  <% if (isEdit) { %><a href="/products/<%= p._id %>" class="hover:text-slate-300"><%= p.name %></a> <span class="mx-1">/</span> <span class="text-slate-300">Edit</span>
-  <% } else { %><span class="text-slate-300">New</span><% } %>
+<nav class="flex items-center gap-1.5 text-sm text-muted" aria-label="Breadcrumb">
+  <a href="/products" class="hover:text-ink">Products</a> <%- icon('chevronRight', 'w-3.5 h-3.5') %>
+  <% if (isEdit) { %><a href="/products/<%= p._id %>" class="hover:text-ink"><%= p.name %></a> <%- icon('chevronRight', 'w-3.5 h-3.5') %> <span class="text-ink font-medium">Edit</span>
+  <% } else { %><span class="text-ink font-medium">New</span><% } %>
 </nav>
 
-<h1 class="text-2xl font-bold text-white tracking-tight"><%= isEdit ? 'Edit ' + p.name : 'New product' %></h1>
+<header data-reveal>
+  <p class="eyebrow"><%= isEdit ? 'Edit product' : 'New product' %></p>
+  <h1 class="page-title mt-1"><%= isEdit ? p.name : 'Add a product' %></h1>
+</header>
 
-<form id="productForm" class="card p-6 space-y-6 max-w-3xl" novalidate>
-  <div id="formError" class="hidden rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300" role="alert"></div>
+<div class="grid lg:grid-cols-[minmax(0,1fr)_20rem] gap-6 items-start">
+  <form id="productForm" class="card p-5 sm:p-6 space-y-6" novalidate data-reveal>
+    <div id="formError" class="hidden rounded-xl border border-bad/30 bg-bad-soft p-3 text-sm font-medium text-bad" role="alert"></div>
 
-  <div class="grid sm:grid-cols-2 gap-5">
-    <div class="sm:col-span-2">
-      <label for="name" class="label">Product name *</label>
-      <input id="name" name="name" class="input" required maxlength="120" value="<%= p.name || '' %>" placeholder="e.g. Steel Rods">
-    </div>
-    <div>
-      <label for="sku" class="label">SKU / Code *</label>
-      <input id="sku" name="sku" class="input font-mono uppercase" required maxlength="40" value="<%= p.sku || '' %>" placeholder="e.g. STEEL-ROD">
-      <p class="text-xs text-slate-500 mt-1">Unique code used for search and on documents.</p>
-    </div>
-    <div>
-      <label for="category" class="label">Category</label>
-      <select id="category" name="category" class="input">
-        <option value="">No category</option>
-        <% categories.forEach((c) => { %>
-          <option value="<%= c._id %>" <%= p.category && String(p.category._id || p.category) === String(c._id) ? 'selected' : '' %>><%= c.name %></option>
-        <% }) %>
-      </select>
-      <p class="text-xs text-slate-500 mt-1"><a href="/categories" class="text-blue-400 hover:text-blue-300">Manage categories</a></p>
-    </div>
-    <div>
-      <label for="uom" class="label">Unit of measure</label>
-      <select id="uom" name="uom" class="input">
-        <% uoms.forEach((u) => { %>
-          <option value="<%= u %>" <%= (p.uom || 'Units') === u ? 'selected' : '' %>><%= u %></option>
-        <% }) %>
-      </select>
-      <% if (isEdit) { %><p class="text-xs text-slate-500 mt-1">Locked once stock has moved.</p><% } %>
-    </div>
-  </div>
-
-  <fieldset class="rounded-xl border border-slate-800 p-4 space-y-4">
-    <legend class="px-2 text-sm font-semibold text-white">Reordering rule</legend>
     <div class="grid sm:grid-cols-2 gap-5">
-      <div>
-        <label for="reorderLevel" class="label">Reorder level</label>
-        <input id="reorderLevel" name="reorderLevel" type="number" min="0" step="any" class="input" value="<%= p.reorderLevel ?? 0 %>">
-        <p class="text-xs text-slate-500 mt-1">At or below this, the product shows as low stock.</p>
+      <div class="sm:col-span-2">
+        <label for="name" class="label">Product name *</label>
+        <input id="name" name="name" class="input" required maxlength="120" value="<%= p.name || '' %>" placeholder="e.g. Steel Rods" autocomplete="off">
       </div>
       <div>
-        <label for="reorderQty" class="label">Reorder quantity</label>
-        <input id="reorderQty" name="reorderQty" type="number" min="0" step="any" class="input" value="<%= p.reorderQty ?? 0 %>">
-        <p class="text-xs text-slate-500 mt-1">Suggested quantity for replenishment receipts.</p>
-      </div>
-    </div>
-  </fieldset>
-
-  <fieldset class="rounded-xl border border-slate-800 p-4 space-y-4">
-    <legend class="px-2 text-sm font-semibold text-white">Cost &amp; purchasing</legend>
-    <div class="grid sm:grid-cols-3 gap-5">
-      <div>
-        <label for="unitCost" class="label">Unit cost (₹)</label>
-        <input id="unitCost" name="unitCost" type="number" min="0" step="any" class="input" value="<%= p.unitCost ?? 0 %>">
-        <p class="text-xs text-slate-500 mt-1">Used for stock value and count differences.</p>
+        <label for="sku" class="label">SKU / Code *</label>
+        <input id="sku" name="sku" class="input font-mono uppercase" required maxlength="40" value="<%= p.sku || '' %>" placeholder="e.g. STEEL-ROD" autocomplete="off">
+        <p class="text-xs text-muted mt-1.5">Unique code used for search, scanning and documents.</p>
       </div>
       <div>
-        <label for="preferredSupplier" class="label">Preferred supplier</label>
-        <input id="preferredSupplier" name="preferredSupplier" class="input" maxlength="200" value="<%= p.preferredSupplier || '' %>" placeholder="e.g. Tata Steel">
-        <p class="text-xs text-slate-500 mt-1">Replenishment groups orders by supplier.</p>
+        <label for="category" class="label">Category</label>
+        <select id="category" name="category" class="input">
+          <option value="">No category</option>
+          <% categories.forEach((c) => { %>
+            <option value="<%= c._id %>" <%= p.category && String(p.category._id || p.category) === String(c._id) ? 'selected' : '' %>><%= c.name %></option>
+          <% }) %>
+        </select>
+        <p class="text-xs text-muted mt-1.5"><a href="/categories" class="link-inline">Manage categories</a></p>
       </div>
       <div>
-        <label for="leadTimeDays" class="label">Lead time (days)</label>
-        <input id="leadTimeDays" name="leadTimeDays" type="number" min="0" step="1" class="input" value="<%= p.leadTimeDays ?? 7 %>">
-        <p class="text-xs text-slate-500 mt-1">How long the supplier takes to deliver.</p>
+        <label for="uom" class="label">Unit of measure</label>
+        <select id="uom" name="uom" class="input">
+          <% uoms.forEach((u) => { %>
+            <option value="<%= u %>" <%= (p.uom || 'Units') === u ? 'selected' : '' %>><%= u %></option>
+          <% }) %>
+        </select>
+        <% if (isEdit) { %><p class="text-xs text-muted mt-1.5">Locked once stock has moved.</p><% } %>
       </div>
     </div>
-  </fieldset>
 
-  <% if (!isEdit) { %>
-    <fieldset class="rounded-xl border border-slate-800 p-4 space-y-4">
-      <legend class="px-2 text-sm font-semibold text-white">Initial stock <span class="font-normal text-slate-500">(optional)</span></legend>
+    <fieldset class="rounded-2xl border border-line bg-surface-2 p-4 sm:p-5 space-y-4">
+      <legend class="px-2 text-sm font-semibold flex items-center gap-2"><%- icon('replenish', 'w-4 h-4 text-accent-text') %> Reordering rule</legend>
       <div class="grid sm:grid-cols-2 gap-5">
         <div>
-          <label for="initialQty" class="label">Quantity on hand</label>
-          <input id="initialQty" name="initialQty" type="number" min="0" step="any" class="input" value="0">
+          <label for="reorderLevel" class="label">Reorder level</label>
+          <input id="reorderLevel" name="reorderLevel" type="number" min="0" step="any" class="input font-mono" value="<%= p.reorderLevel ?? 0 %>">
+          <p class="text-xs text-muted mt-1.5">At or below this, the product shows as low stock.</p>
         </div>
         <div>
-          <label for="initialLocation" class="label">Stored at</label>
-          <select id="initialLocation" name="initialLocation" class="input">
-            <% locations.forEach((l) => { %>
-              <option value="<%= l._id %>"><%= l.fullName %> (<%= l.warehouse ? l.warehouse.name : '' %>)</option>
-            <% }) %>
-          </select>
+          <label for="reorderQty" class="label">Reorder quantity</label>
+          <input id="reorderQty" name="reorderQty" type="number" min="0" step="any" class="input font-mono" value="<%= p.reorderQty ?? 0 %>">
+          <p class="text-xs text-muted mt-1.5">Suggested quantity for replenishment receipts.</p>
         </div>
       </div>
-      <p class="text-xs text-slate-500">Recorded as a validated inventory adjustment, so it appears in the stock ledger.</p>
     </fieldset>
-  <% } %>
 
-  <div>
-    <label for="description" class="label">Description</label>
-    <textarea id="description" name="description" rows="3" maxlength="2000" class="input" placeholder="Optional notes, specifications..."><%= p.description || '' %></textarea>
-  </div>
+    <fieldset class="rounded-2xl border border-line bg-surface-2 p-4 sm:p-5 space-y-4">
+      <legend class="px-2 text-sm font-semibold flex items-center gap-2"><%- icon('receipts', 'w-4 h-4 text-accent-text') %> Cost &amp; purchasing</legend>
+      <div class="grid sm:grid-cols-3 gap-5">
+        <div>
+          <label for="unitCost" class="label">Unit cost (₹)</label>
+          <input id="unitCost" name="unitCost" type="number" min="0" step="any" class="input font-mono" value="<%= p.unitCost ?? 0 %>">
+          <p class="text-xs text-muted mt-1.5">Used for stock value and count differences.</p>
+        </div>
+        <div>
+          <label for="preferredSupplier" class="label">Preferred supplier</label>
+          <input id="preferredSupplier" name="preferredSupplier" class="input" maxlength="200" value="<%= p.preferredSupplier || '' %>" placeholder="e.g. Tata Steel">
+          <p class="text-xs text-muted mt-1.5">Replenishment groups orders by supplier.</p>
+        </div>
+        <div>
+          <label for="leadTimeDays" class="label">Lead time (days)</label>
+          <input id="leadTimeDays" name="leadTimeDays" type="number" min="0" step="1" class="input font-mono" value="<%= p.leadTimeDays ?? 7 %>">
+          <p class="text-xs text-muted mt-1.5">How long the supplier takes to deliver.</p>
+        </div>
+      </div>
+    </fieldset>
 
-  <div class="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-2 border-t border-slate-800">
-    <a href="<%= isEdit ? '/products/' + p._id : '/products' %>" class="btn btn-secondary">Cancel</a>
-    <button type="submit" id="submitBtn" class="btn btn-primary"><%= isEdit ? 'Save changes' : 'Create product' %></button>
-  </div>
-</form>
+    <% if (!isEdit) { %>
+      <fieldset class="rounded-2xl border border-line bg-surface-2 p-4 sm:p-5 space-y-4">
+        <legend class="px-2 text-sm font-semibold flex items-center gap-2"><%- icon('box', 'w-4 h-4 text-accent-text') %> Initial stock <span class="font-normal text-muted">(optional)</span></legend>
+        <div class="grid sm:grid-cols-2 gap-5">
+          <div>
+            <label for="initialQty" class="label">Quantity on hand</label>
+            <input id="initialQty" name="initialQty" type="number" min="0" step="any" class="input font-mono" value="0">
+          </div>
+          <div>
+            <label for="initialLocation" class="label">Stored at</label>
+            <select id="initialLocation" name="initialLocation" class="input">
+              <% locations.forEach((l) => { %>
+                <option value="<%= l._id %>"><%= l.fullName %> (<%= l.warehouse ? l.warehouse.name : '' %>)</option>
+              <% }) %>
+            </select>
+          </div>
+        </div>
+        <p class="text-xs text-muted">Recorded as a validated inventory adjustment, so it appears in the stock ledger.</p>
+      </fieldset>
+    <% } %>
 
+    <div>
+      <label for="description" class="label">Description</label>
+      <textarea id="description" name="description" rows="3" maxlength="2000" class="input" placeholder="Optional notes, specifications..."><%= p.description || '' %></textarea>
+    </div>
+
+    <div class="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-5 border-t border-line">
+      <a href="<%= isEdit ? '/products/' + p._id : '/products' %>" class="btn btn-secondary">Cancel</a>
+      <button type="submit" id="submitBtn" class="btn btn-accent" data-magnetic><%- icon('check', 'w-4 h-4') %> <%= isEdit ? 'Save changes' : 'Create product' %></button>
+    </div>
+  </form>
+
+  <!-- Live bin-label preview -->
+  <aside class="lg:sticky lg:top-24 space-y-3" aria-label="Label preview" data-reveal>
+    <p class="eyebrow">Shelf label preview</p>
+    <div class="card p-4 bg-white text-[#15171b] border-dashed" id="labelPreview">
+      <div class="flex items-start justify-between gap-2">
+        <div class="min-w-0">
+          <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-[#676c75]">Product</p>
+          <p class="mt-0.5 font-display text-lg font-bold leading-tight break-words" data-preview="name"><%= p.name || 'Product name' %></p>
+        </div>
+        <%- include('../partials/logo', { cls: 'w-7 h-7 shrink-0' }) %>
+      </div>
+      <svg id="previewBarcode" class="mt-3 w-full h-16" aria-hidden="true"></svg>
+      <div class="mt-2 flex items-center justify-between text-xs text-[#3e434b]">
+        <span data-preview="category"><%= p.category && p.category.name ? p.category.name : 'No category' %></span>
+        <span class="font-mono" data-preview="uom"><%= p.uom || 'Units' %></span>
+      </div>
+    </div>
+    <p class="text-xs text-muted">This is what prints from <span class="font-semibold">Label</span> on the product page. Scan it anywhere in the app.</p>
+  </aside>
+</div>
+
+<script src="/vendor/jsbarcode/JsBarcode.all.min.js"></script>
 <script>
   (() => {
     const form = document.getElementById('productForm');
@@ -122,9 +148,31 @@
 
     const showError = (message) => {
       errorBox.textContent = message;
-      errorBox.classList.remove('hidden');
+      errorBox.classList.remove('hidden', 'animate-shake');
+      void errorBox.offsetWidth;
+      errorBox.classList.add('animate-shake');
       errorBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
     };
+
+    // Label preview follows the form
+    const preview = (key) => document.querySelector(`[data-preview="${key}"]`);
+    const drawBarcode = () => {
+      const sku = form.sku.value.trim().toUpperCase() || 'SKU-CODE';
+      try {
+        if (window.JsBarcode) JsBarcode('#previewBarcode', sku, { format: 'CODE128', height: 44, fontSize: 12, margin: 0, background: '#ffffff', lineColor: '#15171b', font: 'IBM Plex Mono' });
+      } catch (e) {
+        /* characters CODE128 cannot encode: keep the last good barcode */
+      }
+    };
+    const sync = () => {
+      preview('name').textContent = form.name.value.trim() || 'Product name';
+      preview('category').textContent = form.category.value ? form.category.selectedOptions[0].textContent : 'No category';
+      preview('uom').textContent = form.uom.value;
+      drawBarcode();
+    };
+    form.addEventListener('input', sync);
+    form.addEventListener('change', sync);
+    sync();
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();

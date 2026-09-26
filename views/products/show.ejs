@@ -9,32 +9,35 @@
   const moveDirection = (m) => {
     const fromInternal = m.fromLocation && m.fromLocation.type === 'internal';
     const toInternal = m.toLocation && m.toLocation.type === 'internal';
-    if (fromInternal && toInternal) return { sign: '⇄', classes: 'text-blue-300' };
-    if (toInternal) return { sign: '+', classes: 'text-emerald-400' };
-    return { sign: '−', classes: 'text-red-400' };
+    if (fromInternal && toInternal) return { sign: '⇄', classes: 'text-info', dot: 'bg-info' };
+    if (toInternal) return { sign: '+', classes: 'text-ok', dot: 'bg-ok' };
+    return { sign: '−', classes: 'text-bad', dot: 'bg-bad' };
   };
+  const binColors = ['bg-ink', 'bg-accent', 'bg-info', 'bg-ok', 'bg-warn', 'bg-muted'];
+  const orderNow = outlook.orderByDate && new Date(outlook.orderByDate) <= new Date();
 %>
 
-<nav class="text-sm text-slate-500" aria-label="Breadcrumb">
-  <a href="/products" class="hover:text-slate-300">Products</a> <span class="mx-1">/</span> <span class="text-slate-300"><%= product.name %></span>
+<nav class="flex items-center gap-1.5 text-sm text-muted" aria-label="Breadcrumb">
+  <a href="/products" class="hover:text-ink">Products</a> <%- icon('chevronRight', 'w-3.5 h-3.5') %> <span class="text-ink font-medium truncate"><%= product.name %></span>
 </nav>
 
-<div class="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
-  <div class="space-y-2">
+<header class="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+  <div class="space-y-2" data-reveal>
     <div class="flex flex-wrap items-center gap-3">
-      <h1 class="text-2xl font-bold text-white tracking-tight"><%= product.name %></h1>
+      <h1 class="page-title"><%= product.name %></h1>
       <span class="badge <%= st.classes %>"><%= st.label %></span>
-      <% if (!product.isActive) { %><span class="badge bg-slate-500/10 text-slate-400 border-slate-500/30">Archived</span><% } %>
+      <% if (!product.isActive) { %><span class="badge badge-neutral">Archived</span><% } %>
     </div>
-    <p class="text-sm text-slate-400">
-      <span class="font-mono text-slate-300"><%= product.sku %></span>
-      · <%= product.category ? product.category.name : 'No category' %>
-      · Measured in <%= product.uom %>
+    <p class="flex flex-wrap items-center gap-2 text-sm text-muted">
+      <span class="sku"><%= product.sku %></span>
+      <span><%= product.category ? product.category.name : 'No category' %></span>
+      <span aria-hidden="true">·</span>
+      <span>Measured in <%= product.uom %></span>
     </p>
   </div>
   <div class="flex flex-wrap gap-2">
     <% if (product.isActive) { %>
-      <a href="/receipts/new?product=<%= product._id %>&qty=<%= suggestion %>" class="btn <%= stockStatus === 'ok' ? 'btn-secondary' : 'btn-primary' %>"><%- icon('receipts', 'w-4 h-4') %> Reorder</a>
+      <a href="/receipts/new?product=<%= product._id %>&qty=<%= suggestion %>" class="btn <%= stockStatus === 'ok' ? 'btn-secondary' : 'btn-accent' %>" data-magnetic><%- icon('receipts', 'w-4 h-4') %> Reorder</a>
       <a href="/deliveries/new?product=<%= product._id %>" class="btn btn-secondary"><%- icon('deliveries', 'w-4 h-4') %> Deliver</a>
       <a href="/adjustments/new?product=<%= product._id %><%= mainLocation ? '&location=' + mainLocation : '' %>" class="btn btn-secondary"><%- icon('adjustments', 'w-4 h-4') %> Count</a>
     <% } %>
@@ -48,80 +51,89 @@
       <% } %>
     <% } %>
   </div>
-</div>
+</header>
 
 <% if (stockStatus !== 'ok' && product.isActive) { %>
-  <div class="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200 flex items-start gap-3" role="status">
-    <%- icon('warning', 'w-5 h-5 shrink-0 text-amber-400') %>
-    <p>
-      <% if (stockStatus === 'out') { %>Out of stock.<% } else { %>Only <%= fmtQty(onHand) %> <%= product.uom %> left (reorder level <%= fmtQty(product.reorderLevel) %>).<% } %>
+  <div class="relative overflow-hidden rounded-2xl border <%= stockStatus === 'out' ? 'border-bad/30 bg-bad-soft' : 'border-warn/30 bg-warn-soft' %> p-4 pl-5 text-sm flex flex-col sm:flex-row sm:items-center gap-3" role="status" data-reveal>
+    <span class="absolute left-0 inset-y-0 w-1.5 hazard" aria-hidden="true"></span>
+    <%- icon('warning', 'w-5 h-5 shrink-0 ' + (stockStatus === 'out' ? 'text-bad' : 'text-warn')) %>
+    <p class="flex-1 text-ink-2">
+      <% if (stockStatus === 'out') { %><strong class="text-bad">Out of stock.</strong><% } else { %>Only <strong class="text-ink"><%= fmtQty(onHand) %> <%= product.uom %></strong> left (reorder level <%= fmtQty(product.reorderLevel) %>).<% } %>
       <% if (incoming > 0) { %><%= fmtQty(incoming) %> <%= product.uom %> already incoming.<% } %>
-      Suggested reorder: <strong><%= fmtQty(suggestion) %> <%= product.uom %></strong>.
+      Suggested reorder: <strong class="text-ink"><%= fmtQty(suggestion) %> <%= product.uom %></strong>.
     </p>
+    <a href="/receipts/new?product=<%= product._id %>&qty=<%= suggestion %>" class="btn btn-primary btn-sm self-start sm:self-auto">Create receipt</a>
   </div>
 <% } %>
 
 <!-- Stock summary -->
-<div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
+<div class="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
   <% [
-    { label: 'On hand', value: onHand, hint: 'across all locations', tone: 'text-white' },
-    { label: 'Incoming', value: incoming, hint: 'confirmed receipts', tone: 'text-emerald-400' },
-    { label: 'Outgoing', value: outgoing, hint: 'confirmed deliveries', tone: 'text-red-400' },
-    { label: 'Forecast', value: forecast, hint: forecast < 0 ? 'deliveries exceed stock' : 'on hand + in − out', tone: forecast < 0 ? 'text-red-400' : forecast <= product.reorderLevel ? 'text-amber-400' : 'text-blue-300' },
+    { label: 'On hand', value: onHand, hint: 'across all locations', tone: '', icon: 'box' },
+    { label: 'Incoming', value: incoming, hint: 'confirmed receipts', tone: incoming ? 'text-ok' : '', icon: 'receipts' },
+    { label: 'Outgoing', value: outgoing, hint: 'confirmed deliveries', tone: outgoing ? 'text-bad' : '', icon: 'deliveries' },
+    { label: 'Forecast', value: forecast, hint: forecast < 0 ? 'deliveries exceed stock' : 'on hand + in − out', tone: forecast < 0 ? 'text-bad' : forecast <= product.reorderLevel ? 'text-warn' : 'text-info', icon: 'sparkles' },
   ].forEach((k) => { %>
-    <div class="card p-4">
-      <p class="text-xs font-semibold uppercase tracking-wider text-slate-400"><%= k.label %></p>
-      <p class="mt-2 text-2xl font-bold tabular-nums <%= k.tone %>"><%= fmtQty(k.value) %> <span class="text-sm font-medium text-slate-500"><%= product.uom %></span></p>
-      <p class="text-xs text-slate-500 mt-1"><%= k.hint %></p>
+    <div class="card p-4" data-reveal>
+      <p class="flex items-center justify-between text-xs font-semibold text-muted"><%= k.label %> <span class="text-muted"><%- icon(k.icon, 'w-4 h-4') %></span></p>
+      <p class="mt-3"><span class="stat-value !text-[1.75rem] <%= k.tone %>" data-count-to="<%= k.value %>"><%= fmtQty(k.value) %></span> <span class="text-sm font-medium text-muted"><%= product.uom %></span></p>
+      <p class="text-xs text-muted mt-1"><%= k.hint %></p>
     </div>
   <% }) %>
-  <div class="card p-4 col-span-2 lg:col-span-1">
-    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Reordering rule</p>
-    <p class="mt-2 text-sm text-slate-300">Reorder at <strong class="text-white"><%= fmtQty(product.reorderLevel) %></strong> <%= product.uom %></p>
-    <p class="text-sm text-slate-300">Order <strong class="text-white"><%= product.reorderQty ? fmtQty(product.reorderQty) : '—' %></strong> <%= product.reorderQty ? product.uom : '' %></p>
+  <div class="card p-4 col-span-2 lg:col-span-1" data-reveal>
+    <p class="text-xs font-semibold text-muted">Reordering rule</p>
+    <p class="mt-3 text-sm text-ink-2">Reorder at <strong class="font-mono text-ink"><%= fmtQty(product.reorderLevel) %></strong> <%= product.uom %></p>
+    <p class="text-sm text-ink-2">Order <strong class="font-mono text-ink"><%= product.reorderQty ? fmtQty(product.reorderQty) : '—' %></strong> <%= product.reorderQty ? product.uom : '' %></p>
   </div>
 </div>
 
 <!-- Outlook: forecast from the ledger -->
-<section class="card p-5 space-y-4" aria-label="Stock outlook">
-  <div class="flex flex-wrap items-start justify-between gap-3">
+<section class="card" aria-label="Stock outlook" data-reveal>
+  <div class="panel-head flex-wrap">
     <div>
-      <h2 class="text-sm font-semibold text-white flex items-center gap-2">Stock timeline <span class="badge <%= o.classes %>"><%= o.label %></span></h2>
-      <p class="text-xs text-slate-500">Last 60 days from the ledger · next 30 days projected from confirmed operations and average usage</p>
+      <h2 class="panel-title flex items-center gap-2">Stock timeline <span class="badge <%= o.classes %>"><%= o.label %></span></h2>
+      <p class="text-xs text-muted">Last 60 days from the ledger · next 30 days projected from confirmed operations and average usage</p>
     </div>
-    <svg id="skuBarcode" class="h-12 bg-white rounded px-2" aria-label="Barcode <%= product.sku %>"></svg>
+    <div class="rounded-lg bg-white px-2 py-1 border border-line"><svg id="skuBarcode" class="h-11 block" aria-label="Barcode <%= product.sku %>"></svg></div>
   </div>
-  <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 text-sm">
-    <div class="rounded-xl bg-slate-900/60 border border-slate-800 p-3"><p class="text-xs text-slate-500">Usage / day</p><p class="font-semibold text-white tabular-nums"><%= outlook.avgDaily ? (Math.round(outlook.avgDaily * 10) / 10).toLocaleString('en-IN') + ' ' + product.uom : '—' %></p></div>
-    <div class="rounded-xl bg-slate-900/60 border border-slate-800 p-3"><p class="text-xs text-slate-500">Days of cover</p><p class="font-semibold tabular-nums <%= outlook.daysOfCover !== null && outlook.daysOfCover <= outlook.leadTime ? 'text-red-400' : 'text-white' %>"><%= outlook.daysOfCover === null ? '—' : outlook.daysOfCover + (outlook.daysOfCover === 1 ? ' day' : ' days') %></p></div>
-    <div class="rounded-xl bg-slate-900/60 border border-slate-800 p-3"><p class="text-xs text-slate-500">Runs out</p><p class="font-semibold <%= outlook.stockoutDate ? 'text-amber-400' : 'text-white' %>"><%= outlook.status === 'out' ? 'Already out' : outlook.stockoutDate ? fmtDate(outlook.stockoutDate) : 'Not within 30 days' %></p></div>
-    <div class="rounded-xl bg-slate-900/60 border border-slate-800 p-3"><p class="text-xs text-slate-500">Order by</p><p class="font-semibold <%= outlook.orderByDate && new Date(outlook.orderByDate) <= new Date() ? 'text-red-400' : 'text-white' %>"><%= outlook.orderByDate ? (new Date(outlook.orderByDate) <= new Date() ? 'Now' : fmtDate(outlook.orderByDate)) : '—' %></p></div>
-    <div class="rounded-xl bg-slate-900/60 border border-slate-800 p-3"><p class="text-xs text-slate-500">Supplier · lead time</p><p class="font-semibold text-white truncate" title="<%= product.preferredSupplier %>"><%= product.preferredSupplier || '—' %> · <%= outlook.leadTime %>d</p></div>
-    <div class="rounded-xl bg-slate-900/60 border border-slate-800 p-3"><p class="text-xs text-slate-500">Stock value</p><p class="font-semibold text-white tabular-nums"><%= fmtMoney(onHand * (product.unitCost || 0)) %></p><p class="text-[11px] text-slate-500"><%= fmtMoney(product.unitCost || 0) %> / <%= product.uom %></p></div>
+  <div class="p-4 sm:p-5 space-y-4">
+    <dl class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 text-sm">
+      <div class="rounded-xl bg-surface-2 border border-line p-3"><dt class="text-xs text-muted">Usage / day</dt><dd class="mt-0.5 font-semibold tabular"><%= outlook.avgDaily ? (Math.round(outlook.avgDaily * 10) / 10).toLocaleString('en-IN') + ' ' + product.uom : '—' %></dd></div>
+      <div class="rounded-xl bg-surface-2 border border-line p-3"><dt class="text-xs text-muted">Days of cover</dt><dd class="mt-0.5 font-semibold tabular <%= outlook.daysOfCover !== null && outlook.daysOfCover <= outlook.leadTime ? 'text-bad' : '' %>"><%= outlook.daysOfCover === null ? '—' : outlook.daysOfCover + (outlook.daysOfCover === 1 ? ' day' : ' days') %></dd></div>
+      <div class="rounded-xl bg-surface-2 border border-line p-3"><dt class="text-xs text-muted">Runs out</dt><dd class="mt-0.5 font-semibold <%= outlook.stockoutDate ? 'text-warn' : '' %>"><%= outlook.status === 'out' ? 'Already out' : outlook.stockoutDate ? fmtDate(outlook.stockoutDate) : 'Not within 30 days' %></dd></div>
+      <div class="rounded-xl bg-surface-2 border border-line p-3"><dt class="text-xs text-muted">Order by</dt><dd class="mt-0.5 font-semibold <%= orderNow ? 'text-bad' : '' %>"><%= outlook.orderByDate ? (orderNow ? 'Now' : fmtDate(outlook.orderByDate)) : '—' %></dd></div>
+      <div class="rounded-xl bg-surface-2 border border-line p-3"><dt class="text-xs text-muted">Supplier · lead time</dt><dd class="mt-0.5 font-semibold truncate" title="<%= product.preferredSupplier %>"><%= product.preferredSupplier || '—' %> · <%= outlook.leadTime %>d</dd></div>
+      <div class="rounded-xl bg-surface-2 border border-line p-3"><dt class="text-xs text-muted">Stock value</dt><dd class="mt-0.5 font-semibold tabular"><%= fmtMoney(onHand * (product.unitCost || 0)) %> <span class="block text-[11px] font-normal text-muted"><%= fmtMoney(product.unitCost || 0) %> / <%= product.uom %></span></dd></div>
+    </dl>
+    <div class="h-72"><canvas id="timelineChart" role="img" aria-label="On-hand stock over time with projection"></canvas></div>
   </div>
-  <div class="h-72"><canvas id="timelineChart" role="img" aria-label="On-hand stock over time with projection"></canvas></div>
 </section>
 
 <div class="grid lg:grid-cols-2 gap-6">
   <!-- Stock per location -->
-  <section class="card overflow-hidden">
-    <h2 class="px-4 py-3 border-b border-slate-800 text-sm font-semibold text-white">Stock by location</h2>
+  <section class="card overflow-hidden" data-reveal aria-labelledby="binsTitle">
+    <div class="panel-head">
+      <h2 id="binsTitle" class="panel-title">Stock by location</h2>
+      <span class="text-xs text-muted"><%= locations.length %> <%= locations.length === 1 ? 'bin' : 'bins' %></span>
+    </div>
     <% if (locations.length === 0) { %>
-      <p class="p-6 text-sm text-slate-400">No stock in any location.</p>
+      <%- include('../partials/empty', { art: 'bins', title: 'Not on any shelf', text: 'No stock in any location.', compact: true }) %>
     <% } else { %>
-      <table class="min-w-full">
+      <div class="px-4 pt-4">
+        <div class="flex h-3 w-full overflow-hidden rounded-full bg-sunken" role="img" aria-label="Share of stock per location">
+          <% locations.forEach((q, i) => { const share = onHand > 0 ? (q.quantity / onHand) * 100 : 0; %>
+            <span class="<%= binColors[i % binColors.length] %> h-full border-r-2 border-surface last:border-r-0" style="width: <%= share.toFixed(2) %>%" title="<%= q.location.fullName %>: <%= fmtQty(q.quantity) %>"></span>
+          <% }) %>
+        </div>
+      </div>
+      <table class="table mt-2">
         <thead><tr><th class="th">Location</th><th class="th text-right">Quantity</th><th class="th text-right">Share</th></tr></thead>
         <tbody>
-          <% locations.forEach((q) => { const share = onHand > 0 ? Math.round((q.quantity / onHand) * 100) : 0; %>
-            <tr class="border-t border-slate-800">
-              <td class="td font-medium"><%= q.location.fullName %></td>
-              <td class="td text-right tabular-nums"><%= fmtQty(q.quantity) %> <span class="text-xs text-slate-500"><%= product.uom %></span></td>
-              <td class="td text-right w-40">
-                <div class="flex items-center gap-2 justify-end">
-                  <div class="w-20 h-1.5 rounded-full bg-slate-800 overflow-hidden"><div class="h-full bg-blue-500" style="width: <%= share %>%"></div></div>
-                  <span class="text-xs text-slate-400 tabular-nums w-9 text-right"><%= share %>%</span>
-                </div>
-              </td>
+          <% locations.forEach((q, i) => { const share = onHand > 0 ? Math.round((q.quantity / onHand) * 100) : 0; %>
+            <tr>
+              <td class="td"><a href="/locations/<%= q.location._id %>" class="flex items-center gap-2 font-mono text-[0.8125rem] font-semibold hover:text-accent-text"><span class="w-2.5 h-2.5 rounded-sm <%= binColors[i % binColors.length] %>"></span><%= q.location.fullName %></a></td>
+              <td class="td text-right font-mono tabular"><%= fmtQty(q.quantity) %> <span class="text-xs text-muted"><%= product.uom %></span></td>
+              <td class="td text-right tabular text-muted w-24"><%= share %>%</td>
             </tr>
           <% }) %>
         </tbody>
@@ -130,26 +142,29 @@
   </section>
 
   <!-- Open operations -->
-  <section class="card overflow-hidden">
-    <h2 class="px-4 py-3 border-b border-slate-800 text-sm font-semibold text-white">Open operations</h2>
+  <section class="card overflow-hidden" data-reveal aria-labelledby="openOpsTitle">
+    <div class="panel-head">
+      <h2 id="openOpsTitle" class="panel-title">Open operations</h2>
+      <span class="text-xs text-muted"><%= openOperations.length %> open</span>
+    </div>
     <% if (openOperations.length === 0) { %>
-      <p class="p-6 text-sm text-slate-400">Nothing scheduled for this product.</p>
+      <%- include('../partials/empty', { art: 'truck', title: 'Nothing scheduled', text: 'No receipts or deliveries are waiting for this product.', compact: true }) %>
     <% } else { %>
       <div class="overflow-x-auto">
-        <table class="min-w-full">
+        <table class="table table-hover">
           <thead><tr><th class="th">Reference</th><th class="th">Scheduled</th><th class="th text-right">Qty</th><th class="th">Status</th></tr></thead>
           <tbody>
             <% openOperations.forEach((op) => { %>
-              <tr class="border-t border-slate-800 hover:bg-slate-800/30">
+              <tr>
                 <td class="td">
-                  <a href="/operations/<%= op._id %>" class="font-mono text-blue-300 hover:text-blue-200"><%= op.reference %></a>
-                  <div class="text-xs text-slate-500"><%= OPERATION_META[op.type].label %><%= op.partner ? ' · ' + op.partner : '' %></div>
+                  <a href="/operations/<%= op._id %>" class="ref"><%= op.reference %></a>
+                  <div class="text-xs text-muted mt-0.5"><%= OPERATION_META[op.type].label %><%= op.partner ? ' · ' + op.partner : '' %></div>
                 </td>
-                <td class="td text-slate-400 whitespace-nowrap">
+                <td class="td text-muted whitespace-nowrap">
                   <%= fmtDate(op.scheduledDate) %>
-                  <% if (isLate(op)) { %><span class="badge bg-red-500/10 text-red-400 border-red-500/30 ml-1">Late</span><% } %>
+                  <% if (isLate(op)) { %><span class="badge badge-bad ml-1">Late</span><% } %>
                 </td>
-                <td class="td text-right tabular-nums <%= op.type === 'receipt' ? 'text-emerald-400' : op.type === 'delivery' ? 'text-red-400' : '' %>">
+                <td class="td text-right font-mono font-semibold tabular <%= op.type === 'receipt' ? 'text-ok' : op.type === 'delivery' ? 'text-bad' : '' %>">
                   <%= op.type === 'receipt' ? '+' : op.type === 'delivery' ? '−' : '' %><%= fmtQty(op.productQty) %>
                 </td>
                 <td class="td"><span class="badge <%= STATUS_META[op.status].classes %>"><%= STATUS_META[op.status].label %></span></td>
@@ -163,23 +178,26 @@
 </div>
 
 <!-- Recent moves -->
-<section class="card overflow-hidden">
-  <h2 class="px-4 py-3 border-b border-slate-800 text-sm font-semibold text-white">Recent stock moves</h2>
+<section class="card overflow-hidden" data-reveal aria-labelledby="movesTitle">
+  <div class="panel-head">
+    <h2 id="movesTitle" class="panel-title">Recent stock moves</h2>
+    <a href="/moves?product=<%= product._id %>" class="link">Full history <%- icon('arrowRight', 'w-4 h-4') %></a>
+  </div>
   <% if (moves.length === 0) { %>
-    <p class="p-6 text-sm text-slate-400">No stock has moved for this product yet.</p>
+    <%- include('../partials/empty', { art: 'crate', title: 'No moves yet', text: 'No stock has moved for this product yet.', compact: true }) %>
   <% } else { %>
     <div class="overflow-x-auto">
-      <table class="min-w-full">
+      <table class="table table-hover">
         <thead><tr><th class="th">Date</th><th class="th">Reference</th><th class="th">From</th><th class="th">To</th><th class="th text-right">Quantity</th><th class="th">By</th></tr></thead>
         <tbody>
           <% moves.forEach((m) => { const dir = moveDirection(m); %>
-            <tr class="border-t border-slate-800">
-              <td class="td text-slate-400 whitespace-nowrap"><%= fmtDateTime(m.date) %></td>
-              <td class="td"><a href="/operations/<%= m.operation %>" class="font-mono text-blue-300 hover:text-blue-200"><%= m.reference %></a></td>
-              <td class="td text-slate-300"><%= m.fromLocation ? m.fromLocation.fullName : '—' %></td>
-              <td class="td text-slate-300"><%= m.toLocation ? m.toLocation.fullName : '—' %></td>
-              <td class="td text-right tabular-nums font-semibold <%= dir.classes %>"><%= dir.sign %> <%= fmtQty(m.quantity) %></td>
-              <td class="td text-slate-400"><%= m.user ? m.user.name : '—' %></td>
+            <tr>
+              <td class="td text-muted whitespace-nowrap"><%= fmtDateTime(m.date) %></td>
+              <td class="td"><a href="/operations/<%= m.operation %>" class="ref"><%= m.reference %></a></td>
+              <td class="td font-mono text-[0.8125rem] text-ink-2"><%= m.fromLocation ? m.fromLocation.fullName : '—' %></td>
+              <td class="td font-mono text-[0.8125rem] text-ink-2"><%= m.toLocation ? m.toLocation.fullName : '—' %></td>
+              <td class="td text-right font-mono tabular font-semibold <%= dir.classes %>"><%= dir.sign %> <%= fmtQty(m.quantity) %></td>
+              <td class="td text-muted"><%= m.user ? m.user.name : '—' %></td>
             </tr>
           <% }) %>
         </tbody>
@@ -189,9 +207,9 @@
 </section>
 
 <% if (product.description) { %>
-  <section class="card p-4">
-    <h2 class="text-sm font-semibold text-white mb-2">Description</h2>
-    <p class="text-sm text-slate-300 whitespace-pre-line"><%= product.description %></p>
+  <section class="card p-5" data-reveal>
+    <h2 class="panel-title mb-2">Description</h2>
+    <p class="text-sm text-ink-2 whitespace-pre-line leading-relaxed"><%= product.description %></p>
   </section>
 <% } %>
 
@@ -206,71 +224,90 @@
   uom: product.uom,
   sku: product.sku,
 }) %></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<script src="/vendor/chart.js/chart.umd.min.js"></script>
+<script src="/js/charts.js"></script>
+<script src="/vendor/jsbarcode/JsBarcode.all.min.js"></script>
 <script>
   (() => {
     const data = JSON.parse(document.getElementById('timelineData').textContent);
     try {
-      JsBarcode('#skuBarcode', data.sku, { format: 'CODE128', height: 32, fontSize: 11, margin: 4, background: '#ffffff' });
+      JsBarcode('#skuBarcode', data.sku, { format: 'CODE128', height: 30, fontSize: 11, margin: 2, background: '#ffffff', font: 'IBM Plex Mono' });
     } catch (e) {
       document.getElementById('skuBarcode').remove();
     }
     if (!window.Chart) return;
 
     const labels = data.labels.map((d) => new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }));
-    // Vertical markers: today, order-by date, projected stockout
-    const markers = [
-      { index: data.todayIndex, label: 'Today', color: '#94a3b8' },
-      data.orderByIndex !== null && data.orderByIndex >= 0 ? { index: data.orderByIndex, label: 'Order by', color: '#f59e0b' } : null,
-      data.stockoutIndex !== null ? { index: data.stockoutIndex, label: 'Stockout', color: '#ef4444' } : null,
-    ].filter(Boolean);
-    const markerPlugin = {
-      id: 'markers',
-      afterDatasetsDraw(chart) {
-        const { ctx, chartArea, scales } = chart;
-        markers.forEach((m, i) => {
-          const x = scales.x.getPixelForValue(Math.max(0, Math.min(labels.length - 1, m.index)));
-          ctx.save();
-          ctx.strokeStyle = m.color;
-          ctx.setLineDash([4, 4]);
-          ctx.beginPath();
-          ctx.moveTo(x, chartArea.top);
-          ctx.lineTo(x, chartArea.bottom);
-          ctx.stroke();
-          ctx.setLineDash([]);
-          ctx.fillStyle = m.color;
-          ctx.font = '11px sans-serif';
-          ctx.fillText(m.label, x + 4, chartArea.top + 12 + i * 14);
-          ctx.restore();
-        });
-      },
-    };
+    let chart;
 
-    new Chart(document.getElementById('timelineChart'), {
-      type: 'line',
-      data: {
-        labels,
-        datasets: [
-          { label: 'On hand', data: data.actual, borderColor: '#60a5fa', backgroundColor: 'rgba(96, 165, 250, 0.12)', fill: true, pointRadius: 0, tension: 0.25 },
-          { label: 'Projected', data: data.projected.map((v) => (v === null ? null : Math.max(0, v))), borderColor: '#f59e0b', borderDash: [6, 4], pointRadius: 0, tension: 0.25 },
-          { label: 'Reorder level', data: labels.map(() => data.reorderLevel), borderColor: 'rgba(248, 113, 113, 0.6)', borderDash: [2, 3], pointRadius: 0, borderWidth: 1 },
-        ],
-      },
-      options: {
-        maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        plugins: {
-          legend: { labels: { color: '#94a3b8', boxWidth: 12 } },
-          tooltip: { callbacks: { label: (c) => (c.parsed.y === null ? null : `${c.dataset.label}: ${c.parsed.y} ${data.uom}`) } },
+    function draw() {
+      const { colors, alpha } = window.StockSense.charts;
+      const c = colors();
+      // Vertical markers: today, order-by date, projected stockout
+      const markers = [
+        { index: data.todayIndex, label: 'Today', color: c.muted },
+        data.orderByIndex !== null && data.orderByIndex >= 0 ? { index: data.orderByIndex, label: 'Order by', color: c.warn } : null,
+        data.stockoutIndex !== null ? { index: data.stockoutIndex, label: 'Stockout', color: c.bad } : null,
+      ].filter(Boolean);
+      const markerPlugin = {
+        id: 'markers',
+        afterDatasetsDraw(ch) {
+          const { ctx, chartArea, scales } = ch;
+          markers.forEach((m, i) => {
+            const x = scales.x.getPixelForValue(Math.max(0, Math.min(labels.length - 1, m.index)));
+            ctx.save();
+            ctx.strokeStyle = m.color;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.moveTo(x, chartArea.top);
+            ctx.lineTo(x, chartArea.bottom);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.fillStyle = m.color;
+            ctx.font = '600 11px "IBM Plex Sans", sans-serif';
+            ctx.fillText(m.label, x + 5, chartArea.top + 12 + i * 15);
+            ctx.restore();
+          });
         },
-        scales: {
-          x: { ticks: { color: '#64748b', maxTicksLimit: 10 }, grid: { display: false } },
-          y: { beginAtZero: true, min: 0, ticks: { color: '#64748b' }, grid: { color: 'rgba(148, 163, 184, 0.1)' } },
+      };
+      // Soft gradient under the on-hand line
+      const fill = (ctx) => {
+        const area = ctx.chart.chartArea;
+        if (!area) return alpha(c.ink, 0.08);
+        const g = ctx.chart.ctx.createLinearGradient(0, area.top, 0, area.bottom);
+        g.addColorStop(0, alpha(c.accent, 0.28));
+        g.addColorStop(1, alpha(c.accent, 0));
+        return g;
+      };
+
+      if (chart) chart.destroy();
+      chart = new Chart(document.getElementById('timelineChart'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            { label: 'On hand', data: data.actual, borderColor: c.ink, backgroundColor: fill, fill: true, pointRadius: 0, pointHoverRadius: 4, borderWidth: 2, tension: 0.25 },
+            { label: 'Projected', data: data.projected.map((v) => (v === null ? null : Math.max(0, v))), borderColor: c.accent, borderDash: [6, 4], pointRadius: 0, borderWidth: 2, tension: 0.25 },
+            { label: 'Reorder level', data: labels.map(() => data.reorderLevel), borderColor: alpha(c.bad, 0.6), borderDash: [2, 3], pointRadius: 0, borderWidth: 1 },
+          ],
         },
-      },
-      plugins: [markerPlugin],
-    });
+        options: {
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { position: 'top', align: 'end' },
+            tooltip: { callbacks: { label: (ctx) => (ctx.parsed.y === null ? null : ` ${ctx.dataset.label}: ${ctx.parsed.y} ${data.uom}`) } },
+          },
+          scales: {
+            x: { ticks: { maxTicksLimit: 10 }, grid: { display: false }, border: { display: false } },
+            y: { beginAtZero: true, min: 0, border: { display: false }, grid: { color: c.line } },
+          },
+        },
+        plugins: [markerPlugin],
+      });
+    }
+    draw();
+    window.StockSense.charts.onTheme(draw);
   })();
 </script>
 

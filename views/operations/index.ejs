@@ -4,6 +4,7 @@
   const query = { tab: filters.tab, warehouse: filters.warehouse, search: filters.search, late: filters.late };
   const hasFilters = filters.warehouse || filters.search || filters.late;
   const iconName = { receipt: 'receipts', delivery: 'deliveries', internal: 'transfers', adjustment: 'adjustments' }[type];
+  const art = { receipt: 'truck', delivery: 'truck', internal: 'bins', adjustment: 'clipboard' }[type];
   const isCount = type === 'adjustment';
   const productSummary = (op) => {
     const names = op.lines.map((l) => (l.product ? l.product.name : 'Unknown product'));
@@ -11,66 +12,64 @@
   };
 %>
 
-<div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-  <div class="flex items-center gap-3">
-    <span class="w-11 h-11 rounded-xl bg-blue-600/15 text-blue-400 flex items-center justify-center ring-1 ring-blue-500/30"><%- icon(iconName, 'w-6 h-6') %></span>
+<header class="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+  <div class="flex items-center gap-4" data-reveal>
+    <span class="tile w-12 h-12 rounded-2xl bg-ink text-canvas shadow-card"><%- icon(iconName, 'w-6 h-6') %></span>
     <div>
-      <h1 class="text-2xl font-bold text-white tracking-tight"><%= meta.plural %></h1>
-      <p class="text-sm text-slate-400"><%= meta.description %></p>
+      <p class="eyebrow">Operations</p>
+      <h1 class="page-title mt-0.5"><%= meta.plural %></h1>
+      <p class="text-sm text-muted mt-1"><%= meta.description %></p>
     </div>
   </div>
-  <a href="<%= base %>/new" class="btn btn-primary"><%- icon('plus', 'w-4 h-4') %> New <%= meta.label %></a>
-</div>
+  <a href="<%= base %>/new" class="btn btn-accent" data-magnetic><%- icon('plus', 'w-4 h-4') %> New <%= meta.label %></a>
+</header>
 
-<!-- Status tabs -->
-<div class="flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Status">
-  <% Object.entries(tabs).forEach(([key, tab]) => { const active = filters.tab === key; %>
-    <a href="<%= base %><%= buildQuery(query, { tab: key, page: null }) %>" role="tab" aria-selected="<%= active %>"
-       class="shrink-0 inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium border transition-colors <%= active ? 'bg-blue-600/15 border-blue-500/40 text-white' : 'border-slate-800 text-slate-400 hover:text-white hover:border-slate-700' %>">
-      <%= tab.label %>
-      <span class="text-xs rounded-md px-1.5 py-0.5 bg-slate-800 text-slate-300"><%= tabCounts[key] || 0 %></span>
-    </a>
-  <% }) %>
-</div>
-
-<!-- Filters -->
-<form method="GET" action="<%= base %>" class="card p-4 flex flex-col lg:flex-row gap-3" role="search">
-  <input type="hidden" name="tab" value="<%= filters.tab %>">
-  <div class="relative flex-1">
-    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"><%- icon('search', 'w-4 h-4') %></span>
-    <input type="search" name="search" value="<%= filters.search %>" class="input pl-9" placeholder="Search reference, <%= meta.partnerLabel.toLowerCase() %> or product" aria-label="Search">
-  </div>
-  <select name="warehouse" class="input lg:w-56" aria-label="Warehouse">
-    <option value="">All warehouses</option>
-    <% warehouses.forEach((w) => { %>
-      <option value="<%= w._id %>" <%= String(w._id) === filters.warehouse ? 'selected' : '' %>><%= w.name %> (<%= w.code %>)</option>
+<!-- Status tabs + filters -->
+<div class="flex flex-col xl:flex-row xl:items-center gap-3">
+  <div class="segmented max-w-full overflow-x-auto scrollbar-none" role="tablist" aria-label="Status">
+    <% Object.entries(tabs).forEach(([key, tab]) => { const active = filters.tab === key; %>
+      <a href="<%= base %><%= buildQuery(query, { tab: key, page: null }) %>" role="tab" aria-selected="<%= active %>">
+        <%= tab.label %>
+        <span class="count-chip"><%= tabCounts[key] || 0 %></span>
+      </a>
     <% }) %>
-  </select>
-  <label class="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-700 text-sm text-slate-300 cursor-pointer select-none">
-    <input type="checkbox" name="late" value="1" class="accent-red-500" <%= filters.late ? 'checked' : '' %>>
-    Late only <span class="badge <%= lateCount ? 'bg-red-500/10 text-red-400 border-red-500/30' : 'bg-slate-800 text-slate-400 border-slate-700' %>"><%= lateCount %></span>
-  </label>
-  <div class="flex gap-2">
-    <button type="submit" class="btn btn-primary flex-1 lg:flex-none">Apply</button>
-    <% if (hasFilters) { %><a href="<%= base %>?tab=<%= filters.tab %>" class="btn btn-secondary">Clear</a><% } %>
   </div>
-</form>
 
-<div class="card overflow-hidden transition-shadow" data-live-region="list">
-  <% if (operations.length === 0) { %>
-    <div class="p-12 text-center space-y-3">
-      <div class="inline-flex w-12 h-12 items-center justify-center rounded-2xl bg-slate-800 text-slate-400"><%- icon(iconName, 'w-6 h-6') %></div>
-      <p class="text-white font-semibold">
-        <% if (hasFilters) { %>No <%= meta.plural.toLowerCase() %> match these filters
-        <% } else if (filters.tab === 'todo') { %>Nothing to do - all caught up
-        <% } else { %>No <%= tabs[filters.tab].label.toLowerCase() %> <%= meta.plural.toLowerCase() %><% } %>
-      </p>
-      <a href="<%= base %>/new" class="text-sm text-blue-400 hover:text-blue-300">Create a <%= meta.label.toLowerCase() %></a>
+  <form method="GET" action="<%= base %>" class="flex flex-1 flex-col sm:flex-row gap-2 xl:justify-end" role="search">
+    <input type="hidden" name="tab" value="<%= filters.tab %>">
+    <div class="relative flex-1 xl:max-w-xs">
+      <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"><%- icon('search', 'w-4 h-4') %></span>
+      <input type="search" name="search" value="<%= filters.search %>" class="input input-sm pl-9" placeholder="Reference, <%= meta.partnerLabel.toLowerCase() %> or product" aria-label="Search">
     </div>
+    <select name="warehouse" class="input input-sm sm:w-52" aria-label="Warehouse">
+      <option value="">All warehouses</option>
+      <% warehouses.forEach((w) => { %>
+        <option value="<%= w._id %>" <%= String(w._id) === filters.warehouse ? 'selected' : '' %>><%= w.name %> (<%= w.code %>)</option>
+      <% }) %>
+    </select>
+    <label class="inline-flex items-center gap-2 h-9 px-3 rounded-[0.6rem] border border-line-2 bg-surface text-sm cursor-pointer select-none whitespace-nowrap">
+      <input type="checkbox" name="late" value="1" <%= filters.late ? 'checked' : '' %>>
+      Late only <span class="badge <%= lateCount ? 'badge-bad' : 'badge-neutral' %> badge-plain"><%= lateCount %></span>
+    </label>
+    <div class="flex gap-2">
+      <button type="submit" class="btn btn-primary btn-sm h-9 flex-1 sm:flex-none">Apply</button>
+      <% if (hasFilters) { %><a href="<%= base %>?tab=<%= filters.tab %>" class="btn btn-ghost btn-sm h-9">Clear</a><% } %>
+    </div>
+  </form>
+</div>
+
+<div class="card overflow-hidden" data-live-region="list" data-reveal>
+  <% if (operations.length === 0) { %>
+    <%- include('../partials/empty', {
+      art,
+      title: hasFilters ? `No ${meta.plural.toLowerCase()} match these filters` : filters.tab === 'todo' ? 'Nothing to do - all caught up' : `No ${tabs[filters.tab].label.toLowerCase()} ${meta.plural.toLowerCase()}`,
+      text: filters.tab === 'todo' && !hasFilters ? 'New work shows up here the moment anyone creates it.' : '',
+      action: `<a href="${base}/new" class="btn btn-secondary btn-sm">Create a ${meta.label.toLowerCase()}</a>`,
+    }) %>
   <% } else { %>
     <div class="overflow-x-auto">
-      <table class="min-w-full">
-        <thead class="bg-slate-900/80">
+      <table class="table table-hover">
+        <thead>
           <tr>
             <th class="th">Reference</th>
             <th class="th"><%= isCount ? 'Location counted' : type === 'internal' ? 'Route' : meta.partnerLabel %></th>
@@ -82,25 +81,29 @@
         </thead>
         <tbody>
           <% operations.forEach((op) => { const late = isLate(op); %>
-            <tr class="border-t border-slate-800 hover:bg-slate-800/30 cursor-pointer" onclick="if (!event.target.closest('a')) window.location='/operations/<%= op._id %>'">
+            <tr class="cursor-pointer" onclick="if (!event.target.closest('a')) window.location='/operations/<%= op._id %>'">
               <td class="td whitespace-nowrap">
-                <a href="/operations/<%= op._id %>" class="font-mono font-semibold text-blue-300 hover:text-blue-200"><%= op.reference %></a>
-                <% if (type === 'delivery' && op.status === 'ready') { %>
-                  <div class="text-[11px] text-slate-500 mt-0.5"><%= op.packedAt ? 'Packed' : op.pickedAt ? 'Picked' : 'To pick' %></div>
+                <a href="/operations/<%= op._id %>" class="ref"><%= op.reference %></a>
+                <% if (type === 'delivery' && op.status === 'ready') { const stage = op.packedAt ? 2 : op.pickedAt ? 1 : 0; %>
+                  <div class="mt-1 flex items-center gap-1 text-[11px] text-muted" title="Pick → pack → ship">
+                    <span class="w-1.5 h-1.5 rounded-full <%= stage >= 1 ? 'bg-ok' : 'bg-line-2' %>"></span>
+                    <span class="w-1.5 h-1.5 rounded-full <%= stage >= 2 ? 'bg-ok' : 'bg-line-2' %>"></span>
+                    <span class="ml-0.5"><%= op.packedAt ? 'Packed' : op.pickedAt ? 'Picked' : 'To pick' %></span>
+                  </div>
                 <% } %>
               </td>
               <% if (isCount) { %>
-                <td class="td text-slate-300 whitespace-nowrap"><%= op.sourceLocation.fullName %><%= op.blindCount ? ' · blind' : '' %></td>
+                <td class="td whitespace-nowrap font-mono text-[0.8125rem]"><%= op.sourceLocation.fullName %><%= op.blindCount ? ' · blind' : '' %></td>
               <% } else if (type === 'internal') { %>
-                <td class="td text-slate-300 whitespace-nowrap"><%= op.sourceLocation.fullName %> <span class="text-slate-500">→</span> <%= op.destLocation.fullName %></td>
+                <td class="td whitespace-nowrap font-mono text-[0.8125rem]"><%= op.sourceLocation.fullName %> <span class="text-muted">→</span> <%= op.destLocation.fullName %></td>
               <% } else { %>
-                <td class="td text-slate-200"><%= op.partner || '—' %></td>
-                <td class="td text-slate-400 whitespace-nowrap"><%= type === 'receipt' ? op.destLocation.fullName : op.sourceLocation.fullName %></td>
+                <td class="td font-medium"><%= op.partner || '—' %></td>
+                <td class="td text-muted whitespace-nowrap font-mono text-[0.8125rem]"><%= type === 'receipt' ? op.destLocation.fullName : op.sourceLocation.fullName %></td>
               <% } %>
-              <td class="td text-slate-400 max-w-xs truncate" title="<%= productSummary(op) %>"><%= productSummary(op) %></td>
-              <td class="td whitespace-nowrap <%= late ? 'text-red-400' : 'text-slate-400' %>">
+              <td class="td text-muted max-w-xs truncate" title="<%= productSummary(op) %>"><%= productSummary(op) %></td>
+              <td class="td whitespace-nowrap <%= late ? 'text-bad font-semibold' : 'text-muted' %>">
                 <%= fmtDate(op.scheduledDate) %>
-                <% if (late) { %><span class="badge bg-red-500/10 text-red-400 border-red-500/30 ml-1">Late</span><% } %>
+                <% if (late) { %><span class="badge badge-bad ml-1">Late</span><% } %>
               </td>
               <td class="td"><span class="badge <%= STATUS_META[op.status].classes %>"><%= isCount && op.status === 'ready' ? 'Awaiting approval' : STATUS_META[op.status].label %></span></td>
             </tr>

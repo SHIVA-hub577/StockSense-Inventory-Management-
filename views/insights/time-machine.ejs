@@ -5,104 +5,215 @@
   const daysSpan = Math.max(1, Math.round((new Date(today) - new Date(minDate)) / 86400000));
   const offset = Math.max(0, Math.min(daysSpan, Math.round((new Date(filters.date) - new Date(minDate)) / 86400000)));
   const valueDelta = currentValue - totalValue;
+  const maxMoves = Math.max(1, ...activity.map((a) => a.moves));
+  const asOfLabel = new Date(asOf).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 %>
 
-<div class="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+<header class="flex flex-col lg:flex-row lg:items-end justify-between gap-4" data-reveal>
   <div>
-    <h1 class="text-2xl font-bold text-white tracking-tight flex items-center gap-2"><%- icon('history', 'w-6 h-6 text-blue-400') %> Time machine</h1>
-    <p class="text-sm text-slate-400 mt-1">Your exact inventory at the end of any day, rebuilt move-by-move from the ledger.</p>
+    <p class="eyebrow">Insights</p>
+    <h1 class="page-title mt-1">Time machine</h1>
+    <p class="text-sm text-muted mt-1.5">Your exact inventory at the end of any day, rebuilt move-by-move from the ledger. Drag the scrubber.</p>
   </div>
-</div>
+</header>
 
-<form method="GET" action="/insights/time-machine" id="tmForm" class="card p-5 space-y-4" aria-label="Choose a date">
-  <div class="flex flex-col lg:flex-row lg:items-center gap-4">
-    <div class="flex-1 space-y-2">
-      <div class="flex justify-between text-xs text-slate-500"><span><%= fmtDate(firstDate) %></span><span>Today</span></div>
-      <input type="range" id="tmSlider" min="0" max="<%= daysSpan %>" value="<%= offset %>" class="w-full accent-blue-500" aria-label="Days since the first recorded move">
+<form method="GET" action="/insights/time-machine" id="tmForm" class="card overflow-hidden" aria-label="Choose a date" data-reveal>
+  <div class="p-5 sm:p-6 space-y-5">
+    <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+      <div>
+        <p class="text-xs font-semibold text-muted">Showing stock at the end of</p>
+        <p class="mt-1 font-display text-2xl sm:text-3xl font-bold tracking-tight" id="tmLabel" aria-live="polite"><%= asOfLabel %></p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button type="button" id="tmPlay" class="btn btn-secondary" aria-pressed="false"><span data-play-icon>▶</span> <span data-play-label>Replay history</span></button>
+        <input type="date" name="date" id="tmDate" min="<%= minDate %>" max="<%= today %>" value="<%= filters.date %>" class="input w-44 font-mono" aria-label="Date">
+        <button type="submit" class="btn btn-primary">Travel</button>
+      </div>
     </div>
-    <div class="flex items-center gap-2">
-      <input type="date" name="date" id="tmDate" min="<%= minDate %>" max="<%= today %>" value="<%= filters.date %>" class="input w-44" aria-label="Date">
-      <button type="submit" class="btn btn-primary">Travel</button>
+
+    <!-- Scrubber: one bar per day, height = number of stock moves that day -->
+    <div class="relative select-none" id="tmScrubber">
+      <div class="flex items-end gap-px h-20 rounded-xl bg-sunken px-2 pt-2" id="tmHistogram" aria-hidden="true">
+        <% activity.forEach((a, i) => { %>
+          <span class="flex-1 min-w-px rounded-t-[3px] transition-colors duration-150 <%= i <= offset ? 'bg-accent' : 'bg-line-2' %>" style="height: <%= a.moves ? Math.max(8, (a.moves / maxMoves) * 100).toFixed(1) : 3 %>%" title="<%= a.day %> · <%= a.moves %> move<%= a.moves === 1 ? '' : 's' %>"></span>
+        <% }) %>
+      </div>
+      <input type="range" id="tmSlider" min="0" max="<%= daysSpan %>" value="<%= offset %>" class="scrubber absolute inset-x-0 -bottom-2 w-full" aria-label="Days since the first recorded move" aria-valuetext="<%= asOfLabel %>">
     </div>
-  </div>
-  <div class="grid sm:grid-cols-3 gap-3">
-    <input type="search" name="search" value="<%= filters.search %>" class="input" placeholder="Product name or SKU" aria-label="Search">
-    <select name="warehouse" class="input" aria-label="Warehouse">
-      <option value="">All warehouses</option>
-      <% warehouses.forEach((w) => { %><option value="<%= w._id %>" <%= String(w._id) === filters.warehouse ? 'selected' : '' %>><%= w.name %></option><% }) %>
-    </select>
-    <select name="category" class="input" aria-label="Category">
-      <option value="">All categories</option>
-      <% categories.forEach((c) => { %><option value="<%= c._id %>" <%= String(c._id) === filters.category ? 'selected' : '' %>><%= c.name %></option><% }) %>
-    </select>
+    <div class="flex justify-between text-xs font-mono text-muted -mt-1"><span><%= fmtDate(firstDate) %></span><span>Today</span></div>
+
+    <div class="grid sm:grid-cols-3 gap-2 pt-1">
+      <div class="relative">
+        <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"><%- icon('search', 'w-4 h-4') %></span>
+        <input type="search" name="search" value="<%= filters.search %>" class="input input-sm pl-9" placeholder="Product name or SKU" aria-label="Search">
+      </div>
+      <select name="warehouse" class="input input-sm" aria-label="Warehouse">
+        <option value="">All warehouses</option>
+        <% warehouses.forEach((w) => { %><option value="<%= w._id %>" <%= String(w._id) === filters.warehouse ? 'selected' : '' %>><%= w.name %></option><% }) %>
+      </select>
+      <select name="category" class="input input-sm" aria-label="Category">
+        <option value="">All categories</option>
+        <% categories.forEach((c) => { %><option value="<%= c._id %>" <%= String(c._id) === filters.category ? 'selected' : '' %>><%= c.name %></option><% }) %>
+      </select>
+    </div>
   </div>
 </form>
 
-<div class="grid sm:grid-cols-3 gap-4">
-  <div class="card p-4">
-    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Stock value on <%= fmtDate(asOf) %></p>
-    <p class="mt-2 text-3xl font-bold tabular-nums text-white"><%= fmtMoney(totalValue) %></p>
-  </div>
-  <div class="card p-4">
-    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Value today</p>
-    <p class="mt-2 text-3xl font-bold tabular-nums text-white"><%= fmtMoney(currentValue) %></p>
-    <p class="text-xs mt-1 <%= valueDelta >= 0 ? 'text-emerald-400' : 'text-red-400' %>"><%= valueDelta >= 0 ? '+' : '−' %><%= fmtMoney(Math.abs(valueDelta)) %> since then</p>
-  </div>
-  <div class="card p-4">
-    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Products in stock then</p>
-    <p class="mt-2 text-3xl font-bold tabular-nums text-white"><%= productsInStock %></p>
-  </div>
-</div>
-
-<div class="card overflow-hidden">
-  <% if (rows.length === 0) { %>
-    <p class="p-12 text-center text-slate-400">No stock recorded on <%= fmtDate(asOf) %> for these filters.</p>
-  <% } else { %>
-    <div class="overflow-x-auto">
-      <table class="min-w-full">
-        <thead class="bg-slate-900/80">
-          <tr>
-            <th class="th">Product</th>
-            <th class="th">Where it was</th>
-            <th class="th text-right">On <%= fmtDate(asOf) %></th>
-            <th class="th text-right">Value then</th>
-            <th class="th text-right">Today</th>
-            <th class="th text-right">Change</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% rows.forEach((r) => { const p = r.product; %>
-            <tr class="border-t border-slate-800 hover:bg-slate-800/30">
-              <td class="td"><a href="/products/<%= p._id %>" class="font-medium text-white hover:text-blue-300"><%= p.name %></a><div class="text-xs font-mono text-slate-500"><%= p.sku %></div></td>
-              <td class="td text-xs text-slate-400">
-                <% if (r.locations.length === 0) { %>—<% } %>
-                <% r.locations.forEach((l) => { %><span class="inline-block mr-2 whitespace-nowrap"><%= l.location %>: <span class="text-slate-200 tabular-nums"><%= fmtQty(l.qty) %></span></span><% }) %>
-              </td>
-              <td class="td text-right tabular-nums font-semibold <%= r.total <= 0 ? 'text-red-400' : 'text-white' %>"><%= fmtQty(r.total) %> <span class="text-xs font-normal text-slate-500"><%= p.uom %></span></td>
-              <td class="td text-right tabular-nums text-slate-400"><%= r.value ? fmtMoney(r.value) : '—' %></td>
-              <td class="td text-right tabular-nums text-slate-300"><%= fmtQty(r.current) %></td>
-              <td class="td text-right tabular-nums font-semibold <%= r.delta > 0 ? 'text-emerald-400' : r.delta < 0 ? 'text-red-400' : 'text-slate-500' %>"><%= r.delta === 0 ? '0' : (r.delta > 0 ? '+' : '') + fmtQty(r.delta) %></td>
-            </tr>
-          <% }) %>
-        </tbody>
-      </table>
+<div id="tmResults" class="space-y-6 rounded-2xl" aria-live="polite">
+  <div class="grid sm:grid-cols-3 gap-4">
+    <div class="card p-4">
+      <p class="text-xs font-semibold text-muted">Stock value on <%= fmtDate(asOf) %></p>
+      <p class="mt-3 stat-value !text-[1.9rem]"><%= fmtMoney(totalValue) %></p>
     </div>
-  <% } %>
+    <div class="card p-4">
+      <p class="text-xs font-semibold text-muted">Value today</p>
+      <p class="mt-3 stat-value !text-[1.9rem]"><%= fmtMoney(currentValue) %></p>
+      <p class="text-xs font-medium mt-1.5 <%= valueDelta >= 0 ? 'text-ok' : 'text-bad' %>"><%= valueDelta >= 0 ? '+' : '−' %><%= fmtMoney(Math.abs(valueDelta)) %> since then</p>
+    </div>
+    <div class="card p-4">
+      <p class="text-xs font-semibold text-muted">Products in stock then</p>
+      <p class="mt-3 stat-value !text-[1.9rem]"><%= productsInStock %></p>
+    </div>
+  </div>
+
+  <div class="card overflow-hidden">
+    <% if (rows.length === 0) { %>
+      <%- include('../partials/empty', { art: 'search', title: 'Nothing on the shelves then', text: `No stock recorded on ${fmtDate(asOf)} for these filters.` }) %>
+    <% } else { %>
+      <div class="overflow-x-auto">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th class="th">Product</th>
+              <th class="th">Where it was</th>
+              <th class="th text-right">On <%= fmtDate(asOf) %></th>
+              <th class="th text-right">Value then</th>
+              <th class="th text-right">Today</th>
+              <th class="th text-right">Change</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% rows.forEach((r) => { const p = r.product; %>
+              <tr>
+                <td class="td"><a href="/products/<%= p._id %>" class="font-semibold hover:text-accent-text"><%= p.name %></a><div class="mt-1"><span class="sku"><%= p.sku %></span></div></td>
+                <td class="td text-xs">
+                  <% if (r.locations.length === 0) { %><span class="text-muted">—</span><% } %>
+                  <div class="flex flex-wrap gap-1.5">
+                    <% r.locations.forEach((l) => { %><span class="inline-flex items-center gap-1.5 rounded-md bg-sunken px-2 py-0.5 whitespace-nowrap"><span class="font-mono text-muted"><%= l.location %></span> <span class="font-mono font-semibold tabular"><%= fmtQty(l.qty) %></span></span><% }) %>
+                  </div>
+                </td>
+                <td class="td text-right font-mono tabular font-semibold <%= r.total <= 0 ? 'text-bad' : '' %>"><%= fmtQty(r.total) %> <span class="font-sans text-xs font-normal text-muted"><%= p.uom %></span></td>
+                <td class="td text-right font-mono tabular text-muted"><%= r.value ? fmtMoney(r.value) : '—' %></td>
+                <td class="td text-right font-mono tabular text-ink-2"><%= fmtQty(r.current) %></td>
+                <td class="td text-right font-mono tabular font-semibold <%= r.delta > 0 ? 'text-ok' : r.delta < 0 ? 'text-bad' : 'text-muted' %>"><%= r.delta === 0 ? '0' : (r.delta > 0 ? '+' : '') + fmtQty(r.delta) %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
 </div>
 
 <script>
   (() => {
+    const form = document.getElementById('tmForm');
     const slider = document.getElementById('tmSlider');
     const dateInput = document.getElementById('tmDate');
-    const form = document.getElementById('tmForm');
+    const label = document.getElementById('tmLabel');
+    const results = document.getElementById('tmResults');
+    const bars = [...document.querySelectorAll('#tmHistogram > span')];
+    const playBtn = document.getElementById('tmPlay');
     const min = new Date('<%= minDate %>T00:00:00');
     const toInput = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    slider.addEventListener('input', () => {
+    const pretty = (d) => d.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    const dayAt = (offset) => {
       const d = new Date(min);
-      d.setDate(d.getDate() + Number(slider.value));
-      dateInput.value = toInput(d);
+      d.setDate(d.getDate() + Number(offset));
+      return d;
+    };
+
+    // Paint the histogram up to the playhead
+    function paint(offset) {
+      bars.forEach((b, i) => {
+        b.classList.toggle('bg-accent', i <= offset);
+        b.classList.toggle('bg-line-2', i > offset);
+      });
+      const d = dayAt(offset);
+      label.textContent = pretty(d);
+      slider.setAttribute('aria-valuetext', pretty(d));
+    }
+
+    // Load the page for the chosen date and swap only the results (no reload)
+    let timer = null;
+    let seq = 0;
+    async function load() {
+      const params = new URLSearchParams(new FormData(form));
+      [...params.keys()].forEach((k) => { if (!params.get(k)) params.delete(k); });
+      const url = `${form.action}?${params}`;
+      const mine = ++seq;
+      results.classList.add('is-refreshing');
+      try {
+        const res = await fetch(url, { credentials: 'same-origin', headers: { 'X-Live-Refresh': '1' } });
+        if (!res.ok || res.redirected) throw new Error('reload');
+        const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+        const fresh = doc.getElementById('tmResults');
+        if (mine !== seq || !fresh) return;
+        results.innerHTML = fresh.innerHTML;
+        history.replaceState(null, '', url);
+        document.dispatchEvent(new CustomEvent('stocksense:content-updated', { detail: { root: results } }));
+      } catch (e) {
+        if (mine === seq) window.location.href = url; // fall back to a normal page load
+      } finally {
+        if (mine === seq) results.classList.remove('is-refreshing');
+      }
+    }
+    const schedule = (delay = 220) => {
+      clearTimeout(timer);
+      timer = setTimeout(load, delay);
+    };
+
+    slider.addEventListener('input', () => {
+      dateInput.value = toInput(dayAt(slider.value));
+      paint(Number(slider.value));
+      schedule();
     });
-    slider.addEventListener('change', () => form.submit());
+    dateInput.addEventListener('change', () => {
+      if (!dateInput.value) return;
+      const offset = Math.round((new Date(dateInput.value + 'T00:00:00') - min) / 86400000);
+      slider.value = Math.max(0, Math.min(Number(slider.max), offset));
+      paint(Number(slider.value));
+      schedule(0);
+    });
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      schedule(0);
+    });
+    form.querySelectorAll('select').forEach((s) => s.addEventListener('change', () => schedule(0)));
+    form.querySelector('input[type=search]').addEventListener('input', () => schedule(350));
+
+    // Replay: walk from the first move to today
+    let playing = null;
+    const stop = () => {
+      clearInterval(playing);
+      playing = null;
+      playBtn.setAttribute('aria-pressed', 'false');
+      playBtn.querySelector('[data-play-icon]').textContent = '▶';
+      playBtn.querySelector('[data-play-label]').textContent = 'Replay history';
+    };
+    playBtn.addEventListener('click', () => {
+      if (playing) return stop();
+      if (Number(slider.value) >= Number(slider.max)) slider.value = 0;
+      playBtn.setAttribute('aria-pressed', 'true');
+      playBtn.querySelector('[data-play-icon]').textContent = '❚❚';
+      playBtn.querySelector('[data-play-label]').textContent = 'Pause';
+      const stepMs = Math.max(90, Math.min(400, 6000 / Math.max(1, Number(slider.max))));
+      playing = setInterval(() => {
+        slider.value = Number(slider.value) + 1;
+        slider.dispatchEvent(new Event('input'));
+        if (Number(slider.value) >= Number(slider.max)) stop();
+      }, stepMs);
+    });
   })();
 </script>
 

@@ -4,55 +4,57 @@
   const totalValue = groups.reduce((n, g) => n + g.value, 0);
 %>
 
-<div class="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+<header class="flex flex-col lg:flex-row lg:items-end justify-between gap-4" data-reveal>
   <div>
-    <h1 class="text-2xl font-bold text-white tracking-tight flex items-center gap-2"><%- icon('replenish', 'w-6 h-6 text-blue-400') %> Replenishment</h1>
-    <p class="text-sm text-slate-400 mt-1">Products that will run out or are below their reorder level, grouped by supplier. Adjust quantities, then create the receipts in one click.</p>
+    <p class="eyebrow">Purchasing</p>
+    <h1 class="page-title mt-1">Replenishment</h1>
+    <p class="text-sm text-muted mt-1.5 max-w-2xl">Products that will run out or are below their reorder level, grouped by supplier. Adjust quantities, then create the receipts in one click.</p>
   </div>
-  <% if (totalItems) { %>
-    <button type="button" id="createAll" class="btn btn-primary"><span>Create receipts for selected (<span id="selectedCount"><%= totalItems %></span>)</span></button>
-  <% } %>
-</div>
+</header>
 
-<details class="card p-4 text-sm text-slate-300">
-  <summary class="cursor-pointer font-semibold text-white">How suggestions are calculated</summary>
-  <ul class="mt-3 space-y-1.5 list-disc pl-5 text-slate-400">
-    <li><strong class="text-slate-200">Usage</strong> = units delivered to customers over the last <%= usageDays %> days ÷ <%= usageDays %>.</li>
-    <li><strong class="text-slate-200">Projected stock</strong> for each of the next <%= horizon %> days = on hand + confirmed receipts − the larger of (confirmed deliveries, usage × days).</li>
-    <li><strong class="text-slate-200">Runs out</strong> on the first day projected stock reaches zero. <strong class="text-slate-200">Order by</strong> = that day − the supplier's lead time.</li>
-    <li><strong class="text-slate-200">Suggested quantity</strong> brings stock back to reorder level + usage for lead time + <%= coverDays %> days (at least the product's reorder quantity). Stock already on its way is counted, so nothing is ordered twice.</li>
+<details class="card group" data-reveal>
+  <summary class="flex items-center justify-between gap-3 px-5 py-3.5 cursor-pointer list-none text-sm font-semibold">
+    <span class="flex items-center gap-2"><%- icon('info', 'w-4 h-4 text-accent-text') %> How suggestions are calculated</span>
+    <%- icon('chevron', 'w-4 h-4 text-muted transition-transform duration-200 group-open:rotate-180') %>
+  </summary>
+  <ul class="px-5 pb-5 pt-1 space-y-2 text-sm text-muted list-disc pl-10">
+    <li><strong class="text-ink">Usage</strong> = units delivered to customers over the last <%= usageDays %> days ÷ <%= usageDays %>.</li>
+    <li><strong class="text-ink">Projected stock</strong> for each of the next <%= horizon %> days = on hand + confirmed receipts − the larger of (confirmed deliveries, usage × days).</li>
+    <li><strong class="text-ink">Runs out</strong> on the first day projected stock reaches zero. <strong class="text-ink">Order by</strong> = that day − the supplier's lead time.</li>
+    <li><strong class="text-ink">Suggested quantity</strong> brings stock back to reorder level + usage for lead time + <%= coverDays %> days (at least the product's reorder quantity). Stock already on its way is counted, so nothing is ordered twice.</li>
   </ul>
 </details>
 
 <% if (groups.length === 0) { %>
-  <div class="card p-12 text-center space-y-2">
-    <div class="inline-flex w-12 h-12 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-400"><%- icon('check', 'w-6 h-6') %></div>
-    <p class="text-white font-semibold">Nothing to reorder</p>
-    <p class="text-sm text-slate-400">Every product has enough stock (or enough already incoming) for the next <%= horizon %> days.</p>
+  <div class="card" data-reveal>
+    <%- include('../partials/empty', { art: 'truck', title: 'Nothing to reorder', text: `Every product has enough stock (or enough already incoming) for the next ${horizon} days.` }) %>
   </div>
 <% } %>
 
 <div id="groups" class="space-y-6">
   <% groups.forEach((g, gi) => { %>
-    <section class="card overflow-hidden" data-group>
-      <div class="flex flex-col lg:flex-row lg:items-end gap-3 justify-between px-4 py-4 border-b border-slate-800">
-        <div class="grid sm:grid-cols-2 gap-3 flex-1 max-w-2xl">
-          <div>
-            <label class="label" for="supplier-<%= gi %>">Supplier</label>
-            <input id="supplier-<%= gi %>" class="input" data-supplier value="<%= g.supplier %>" placeholder="Supplier to confirm" maxlength="200">
-          </div>
-          <div>
-            <label class="label" for="dest-<%= gi %>">Receive into</label>
-            <select id="dest-<%= gi %>" class="input" data-dest>
-              <% locations.forEach((l) => { %><option value="<%= l._id %>" <%= String(l._id) === g.destination ? 'selected' : '' %>><%= l.fullName %></option><% }) %>
-            </select>
+    <section class="card overflow-hidden" data-group data-reveal>
+      <div class="flex flex-col lg:flex-row lg:items-end gap-4 justify-between px-5 py-4 border-b border-line bg-surface-2">
+        <div class="flex items-start gap-4 flex-1 max-w-3xl">
+          <span class="hidden sm:flex tile w-11 h-11 rounded-xl bg-accent-soft text-accent-text mt-5"><%- icon('receipts', 'w-5 h-5') %></span>
+          <div class="grid sm:grid-cols-2 gap-3 flex-1">
+            <div>
+              <label class="label" for="supplier-<%= gi %>">Supplier</label>
+              <input id="supplier-<%= gi %>" class="input" data-supplier value="<%= g.supplier %>" placeholder="Supplier to confirm" maxlength="200">
+            </div>
+            <div>
+              <label class="label" for="dest-<%= gi %>">Receive into</label>
+              <select id="dest-<%= gi %>" class="input" data-dest>
+                <% locations.forEach((l) => { %><option value="<%= l._id %>" <%= String(l._id) === g.destination ? 'selected' : '' %>><%= l.fullName %></option><% }) %>
+              </select>
+            </div>
           </div>
         </div>
-        <p class="text-sm text-slate-400">Order value <span class="font-semibold text-white" data-group-total><%= fmtMoney(g.value) %></span></p>
+        <p class="text-sm text-muted">Order value <span class="ml-1 font-mono text-base font-semibold text-ink" data-group-total><%= fmtMoney(g.value) %></span></p>
       </div>
       <div class="overflow-x-auto">
-        <table class="min-w-full">
-          <thead class="bg-slate-900/80">
+        <table class="table">
+          <thead>
             <tr>
               <th class="th w-10"><span class="sr-only">Order</span></th>
               <th class="th">Product</th>
@@ -61,22 +63,22 @@
               <th class="th text-right" title="Average units delivered per day">Usage / day</th>
               <th class="th">Runs out</th>
               <th class="th">Order by</th>
-              <th class="th w-32 text-right">Order qty</th>
+              <th class="th w-40 text-right">Order qty</th>
               <th class="th text-right">Value</th>
             </tr>
           </thead>
           <tbody>
             <% g.items.forEach(({ product: p, forecast: f, suggestedQty }) => { const o = OUTLOOK_META[f.status]; const orderNow = f.orderByDate && new Date(f.orderByDate) <= new Date(); %>
-              <tr class="border-t border-slate-800" data-item data-product="<%= p._id %>" data-cost="<%= p.unitCost || 0 %>">
-                <td class="td"><input type="checkbox" checked class="accent-blue-500 w-4 h-4" data-pick aria-label="Order <%= p.name %>"></td>
-                <td class="td"><a href="/products/<%= p._id %>" class="font-medium text-white hover:text-blue-300"><%= p.name %></a><div class="text-xs font-mono text-slate-500"><%= p.sku %> · lead time <%= f.leadTime %>d</div></td>
+              <tr class="transition-opacity" data-item data-product="<%= p._id %>" data-cost="<%= p.unitCost || 0 %>">
+                <td class="td"><input type="checkbox" checked class="w-4 h-4" data-pick aria-label="Order <%= p.name %>"></td>
+                <td class="td"><a href="/products/<%= p._id %>" class="font-semibold hover:text-accent-text"><%= p.name %></a><div class="mt-1 flex items-center gap-2 text-xs text-muted"><span class="sku"><%= p.sku %></span> lead time <%= f.leadTime %>d</div></td>
                 <td class="td"><span class="badge <%= o.classes %>"><%= o.label %></span></td>
-                <td class="td text-right tabular-nums"><%= fmtQty(f.onHand) %> <span class="text-xs text-slate-500"><%= p.uom %></span><% if (f.incoming) { %><div class="text-[11px] text-emerald-400">+<%= fmtQty(f.incoming) %> incoming</div><% } %></td>
-                <td class="td text-right tabular-nums text-slate-300"><%= f.avgDaily ? (Math.round(f.avgDaily * 10) / 10).toLocaleString('en-IN') : '—' %></td>
-                <td class="td whitespace-nowrap <%= f.stockoutDay !== null && f.stockoutDay <= f.leadTime ? 'text-red-400' : 'text-slate-300' %>"><%= f.status === 'out' ? 'Now' : f.stockoutDate ? fmtRelativeDays(f.stockoutDate) : '—' %></td>
-                <td class="td whitespace-nowrap <%= orderNow ? 'text-red-400 font-semibold' : 'text-slate-300' %>"><%= f.orderByDate ? (orderNow ? 'Now' : fmtDate(f.orderByDate)) : '—' %></td>
-                <td class="td"><input type="number" min="0" step="any" value="<%= suggestedQty %>" class="input text-right tabular-nums py-1.5" data-qty aria-label="Quantity of <%= p.name %>"></td>
-                <td class="td text-right tabular-nums text-slate-300" data-line-total><%= fmtMoney(suggestedQty * (p.unitCost || 0)) %></td>
+                <td class="td text-right font-mono tabular"><%= fmtQty(f.onHand) %> <span class="font-sans text-xs text-muted"><%= p.uom %></span><% if (f.incoming) { %><div class="font-sans text-[11px] text-ok">+<%= fmtQty(f.incoming) %> incoming</div><% } %></td>
+                <td class="td text-right font-mono tabular text-ink-2"><%= f.avgDaily ? (Math.round(f.avgDaily * 10) / 10).toLocaleString('en-IN') : '—' %></td>
+                <td class="td whitespace-nowrap <%= f.stockoutDay !== null && f.stockoutDay <= f.leadTime ? 'text-bad font-semibold' : 'text-ink-2' %>"><%= f.status === 'out' ? 'Now' : f.stockoutDate ? fmtRelativeDays(f.stockoutDate) : '—' %></td>
+                <td class="td whitespace-nowrap <%= orderNow ? 'text-bad font-semibold' : 'text-ink-2' %>"><%= f.orderByDate ? (orderNow ? 'Now' : fmtDate(f.orderByDate)) : '—' %></td>
+                <td class="td text-right"><input type="number" min="0" step="any" value="<%= suggestedQty %>" class="input text-right tabular" data-qty aria-label="Quantity of <%= p.name %>"></td>
+                <td class="td text-right font-mono tabular text-ink-2" data-line-total><%= fmtMoney(suggestedQty * (p.unitCost || 0)) %></td>
               </tr>
             <% }) %>
           </tbody>
@@ -87,13 +89,29 @@
 </div>
 
 <% if (totalItems) { %>
+  <!-- Order summary bar -->
+  <div class="sticky bottom-20 lg:bottom-4 z-20" data-reveal>
+    <div class="card shadow-float flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-3.5 border-line-2">
+      <p class="text-sm text-muted">
+        <span class="font-semibold text-ink"><span id="selectedCount"><%= totalItems %></span> products</span> selected across <%= groups.length %> supplier<%= groups.length === 1 ? '' : 's' %> ·
+        <span class="font-mono font-semibold text-ink" id="grandTotal"><%= fmtMoney(totalValue) %></span>
+      </p>
+      <button type="button" id="createAll" class="btn btn-accent btn-lg" data-magnetic><%- icon('receipts', 'w-5 h-5') %> Create receipts</button>
+    </div>
+  </div>
+<% } %>
+
+<% if (totalItems) { %>
+<script src="/js/combobox.js"></script>
 <script>
   (() => {
-    const { api, toast, toastAfterNavigation, setBusy } = window.StockSense;
+    const { api, toast, toastAfterNavigation, setBusy, stepper } = window.StockSense;
     const money = (v) => Number(v).toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
+    document.querySelectorAll('[data-qty]').forEach((input) => stepper(input));
 
     function recalc() {
       let selected = 0;
+      let grand = 0;
       document.querySelectorAll('[data-group]').forEach((group) => {
         let total = 0;
         group.querySelectorAll('[data-item]').forEach((row) => {
@@ -108,8 +126,10 @@
           }
         });
         group.querySelector('[data-group-total]').textContent = money(total);
+        grand += total;
       });
       document.getElementById('selectedCount').textContent = selected;
+      document.getElementById('grandTotal').textContent = money(grand);
       return selected;
     }
     document.getElementById('groups').addEventListener('input', recalc);
@@ -132,6 +152,8 @@
       try {
         const res = await api('POST', '/api/replenishment', { groups });
         toastAfterNavigation(res.message);
+        // Purchase orders fly off to the suppliers
+        if (window.StockSense.scenes) await window.StockSense.scenes.play({ action: 'replenish', count: groups.length });
         window.location.href = '/receipts?tab=ready';
       } catch (err) {
         toast(err.message, 'error', 8000);

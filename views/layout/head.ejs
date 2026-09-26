@@ -1,0 +1,42 @@
+<%
+  // Shared <head> for every page on the new design system.
+  // Locals: title, bodyClass (optional)
+%><!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="theme-color" content="#f6f5f1" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#0c0e11" media="(prefers-color-scheme: dark)" />
+  <title><%= typeof title !== 'undefined' ? title : 'StockSense - Inventory System' %></title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <script>
+    // Theme before first paint (no flash): 'light' | 'dark' | 'system' (default)
+    (function () {
+      var pref = 'system';
+      try { pref = localStorage.getItem('stocksense:theme') || 'system'; } catch (e) {}
+      var dark = pref === 'dark' || (pref !== 'light' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      document.documentElement.dataset.themePref = pref;
+      // Page-to-page transitions are skipped for reloads; don't report that as an error
+      var quiet = function (e) {
+        var vt = e.viewTransition;
+        if (!vt) return;
+        [vt.ready, vt.finished, vt.updateCallbackDone].forEach(function (p) { if (p && p.catch) p.catch(function () {}); });
+      };
+      window.addEventListener('pagereveal', quiet);
+      window.addEventListener('pageswap', quiet);
+    })();
+  </script>
+  <link rel="preload" href="/vendor/fonts/plex-sans/ibm-plex-sans-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="/vendor/fonts/bricolage/bricolage-grotesque-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+  <!-- Page-to-page transitions opt-in, inline so it is known before the first frame -->
+  <style>
+    @view-transition { navigation: auto; }
+    @media (prefers-reduced-motion: reduce) { @view-transition { navigation: none; } }
+  </style>
+  <link rel="stylesheet" href="/css/app.css" />
+</head>
+<body class="min-h-dvh bg-canvas text-ink antialiased <%= typeof bodyClass !== 'undefined' ? bodyClass : '' %>">
+<a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] btn btn-accent btn-sm">Skip to content</a>

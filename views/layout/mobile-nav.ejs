@@ -1,0 +1,30 @@
+<%
+  const currentKey = typeof activeNav !== 'undefined' ? activeNav : '';
+  const quick = [
+    { key: 'dashboard', href: '/dashboard', label: 'Home', icon: 'dashboard' },
+    { key: 'receipts', href: '/receipts', label: 'Receipts', icon: 'receipts' },
+    { key: 'scan', href: '/scan', label: 'Scan', icon: 'scan', primary: true },
+    { key: 'deliveries', href: '/deliveries', label: 'Deliveries', icon: 'deliveries' },
+  ];
+%>
+<nav id="mobile-nav" class="lg:hidden fixed bottom-0 inset-x-0 z-30 border-t border-line bg-surface/90 backdrop-blur-md pb-[env(safe-area-inset-bottom)]" aria-label="Quick navigation">
+  <div class="grid grid-cols-5 h-16">
+    <% quick.forEach((item) => { const active = currentKey === item.key; %>
+      <% if (item.primary) { %>
+        <a href="<%= item.href %>" class="group relative flex flex-col items-center justify-end pb-2 text-[0.68rem] font-semibold <%= active ? 'text-ink' : 'text-ink-2' %>" <%- active ? 'aria-current="page"' : '' %>>
+          <span class="absolute -top-5 w-14 h-14 rounded-2xl bg-accent text-accent-ink flex items-center justify-center shadow-float ring-4 ring-canvas transition-transform duration-300 ease-spring group-active:scale-90"><%- icon(item.icon, 'w-6 h-6') %></span>
+          <%= item.label %>
+        </a>
+      <% } else { %>
+        <a href="<%= item.href %>" class="flex flex-col items-center justify-center gap-1 text-[0.68rem] font-medium transition-colors <%= active ? 'text-ink' : 'text-muted' %>" <%- active ? 'aria-current="page"' : '' %>>
+          <span class="<%= active ? 'text-accent-text' : '' %>"><%- icon(item.icon, 'w-5 h-5') %></span>
+          <%= item.label %>
+        </a>
+      <% } %>
+    <% }) %>
+    <button type="button" data-sidebar-open class="flex flex-col items-center justify-center gap-1 text-[0.68rem] font-medium text-muted" aria-controls="sidebar" aria-expanded="false">
+      <%- icon('menu', 'w-5 h-5') %>
+      More
+    </button>
+  </div>
+</nav>

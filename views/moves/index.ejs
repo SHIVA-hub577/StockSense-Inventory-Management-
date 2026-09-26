@@ -5,6 +5,7 @@
   const productName = filters.product ? (products.find((p) => String(p._id) === filters.product) || {}).name : null;
   const scopeName = filters.location ? (locations.find((l) => String(l._id) === filters.location) || {}).fullName : 'all locations';
   const typeLabels = { receipt: 'Receipt', delivery: 'Delivery', internal: 'Transfer', adjustment: 'Count' };
+  const typeIcons = { receipt: 'receipts', delivery: 'deliveries', internal: 'transfers', adjustment: 'adjustments' };
   // Group rows by day (newest first)
   const groups = [];
   moves.forEach((m) => {
@@ -19,48 +20,58 @@
     if (fromIn && toIn) return '⇄';
     return toIn ? '+' : '−';
   };
+  const toneOf = (dir) => (dir === '+' ? { text: 'text-ok', bubble: 'bg-ok-soft text-ok' } : dir === '−' ? { text: 'text-bad', bubble: 'bg-bad-soft text-bad' } : { text: 'text-info', bubble: 'bg-info-soft text-info' });
+  const timeOf = (d) => new Date(d).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 %>
 
-<div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-  <div>
-    <h1 class="text-2xl font-bold text-white tracking-tight">Move history</h1>
-    <p class="text-sm text-slate-400 mt-1">Every stock movement, as recorded in the ledger.<% if (productName) { %> Running balance of <strong class="text-white"><%= productName %></strong> in <%= scopeName %>.<% } %></p>
+<header class="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+  <div data-reveal>
+    <p class="eyebrow">Ledger</p>
+    <h1 class="page-title mt-1">Move history</h1>
+    <p class="text-sm text-muted mt-1.5">Every stock movement, as recorded in the ledger.<% if (productName) { %> Running balance of <strong class="text-ink"><%= productName %></strong> in <%= scopeName %>.<% } %></p>
   </div>
-  <a href="/moves/export.csv<%= buildQuery(query) %>" class="btn btn-secondary"><%- icon('download', 'w-4 h-4') %> Export CSV</a>
-</div>
+  <div class="flex flex-wrap items-center gap-2">
+    <div class="segmented" role="radiogroup" aria-label="View">
+      <button type="button" role="radio" aria-checked="true" data-moves-view="table"><%- icon('dashboard', 'w-4 h-4') %> Table</button>
+      <button type="button" role="radio" aria-checked="false" data-moves-view="timeline"><%- icon('history', 'w-4 h-4') %> Timeline</button>
+    </div>
+    <a href="/moves/export.csv<%= buildQuery(query) %>" class="btn btn-secondary"><%- icon('download', 'w-4 h-4') %> Export CSV</a>
+  </div>
+</header>
 
-<form method="GET" action="/moves" class="card p-4 grid sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3" role="search" aria-label="Filter moves">
-  <select name="product" class="input xl:col-span-2" aria-label="Product">
+<form method="GET" action="/moves" class="card p-3 grid sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_auto] gap-2" role="search" aria-label="Filter moves" data-reveal>
+  <select name="product" class="input input-sm" aria-label="Product">
     <option value="">All products</option>
     <% products.forEach((p) => { %><option value="<%= p._id %>" <%= String(p._id) === filters.product ? 'selected' : '' %>><%= p.name %> (<%= p.sku %>)</option><% }) %>
   </select>
-  <select name="location" class="input" aria-label="Location">
+  <select name="location" class="input input-sm" aria-label="Location">
     <option value="">All locations</option>
     <% locations.forEach((l) => { %><option value="<%= l._id %>" <%= String(l._id) === filters.location ? 'selected' : '' %>><%= l.fullName %></option><% }) %>
   </select>
-  <select name="type" class="input" aria-label="Type">
+  <select name="type" class="input input-sm" aria-label="Type">
     <option value="">All types</option>
     <% Object.entries(typeLabels).forEach(([v, l]) => { %><option value="<%= v %>" <%= filters.type === v ? 'selected' : '' %>><%= l %>s</option><% }) %>
   </select>
-  <select name="user" class="input" aria-label="Done by">
+  <select name="user" class="input input-sm" aria-label="Done by">
     <option value="">Anyone</option>
     <% users.forEach((u) => { %><option value="<%= u._id %>" <%= String(u._id) === filters.user ? 'selected' : '' %>><%= u.name %></option><% }) %>
   </select>
-  <input type="date" name="from" value="<%= filters.from %>" class="input" aria-label="From date" title="From">
-  <input type="date" name="to" value="<%= filters.to %>" class="input" aria-label="To date" title="To">
-  <div class="flex gap-2 xl:col-span-7 justify-end">
-    <% if (hasFilters) { %><a href="/moves" class="btn btn-secondary">Clear</a><% } %>
-    <button type="submit" class="btn btn-primary">Apply</button>
+  <input type="date" name="from" value="<%= filters.from %>" class="input input-sm" aria-label="From date" title="From">
+  <input type="date" name="to" value="<%= filters.to %>" class="input input-sm" aria-label="To date" title="To">
+  <div class="flex gap-2 justify-end">
+    <% if (hasFilters) { %><a href="/moves" class="btn btn-ghost btn-sm h-9">Clear</a><% } %>
+    <button type="submit" class="btn btn-primary btn-sm h-9">Apply</button>
   </div>
 </form>
 
-<div class="card overflow-hidden transition-shadow" data-live-region="moves">
+<div class="card overflow-hidden" data-live-region="moves" data-reveal>
   <% if (moves.length === 0) { %>
-    <p class="p-12 text-center text-slate-400"><%= hasFilters ? 'No moves match these filters' : 'No stock has moved yet' %></p>
+    <%- include('../partials/empty', { art: hasFilters ? 'search' : 'crate', title: hasFilters ? 'No moves match these filters' : 'No stock has moved yet', text: hasFilters ? 'Try a wider date range or another product.' : 'Validated receipts, deliveries, transfers and counts appear here.' }) %>
   <% } else { %>
-    <div class="overflow-x-auto">
-      <table class="min-w-full">
-        <thead class="bg-slate-900/80">
+    <!-- Table view -->
+    <div class="overflow-x-auto" data-moves-pane="table">
+      <table class="table">
+        <thead>
           <tr>
             <th class="th">Time</th>
             <th class="th">Reference</th>
@@ -73,28 +84,88 @@
           </tr>
         </thead>
         <% groups.forEach((g) => { %>
-          <tbody>
-            <tr class="bg-slate-900/60 border-t border-slate-800">
-              <th colspan="<%= balances ? 8 : 7 %>" class="px-4 py-2 text-left text-xs font-semibold text-slate-300"><%= fmtDate(g.date) %> <span class="font-normal text-slate-500">· <%= fmtRelativeDays(g.date) %> · <%= g.rows.length %> move<%= g.rows.length === 1 ? '' : 's' %></span></th>
+          <tbody class="table-hover">
+            <tr>
+              <th colspan="<%= balances ? 8 : 7 %>" class="px-4 py-2 text-left text-xs font-semibold bg-sunken border-b border-line"><%= fmtDate(g.date) %> <span class="font-normal text-muted">· <%= fmtRelativeDays(g.date) %> · <%= g.rows.length %> move<%= g.rows.length === 1 ? '' : 's' %></span></th>
             </tr>
-            <% g.rows.forEach((m) => { const dir = direction(m); const tone = dir === '+' ? 'text-emerald-400' : dir === '−' ? 'text-red-400' : 'text-blue-300'; const cost = m.product ? m.product.unitCost || 0 : 0; %>
-              <tr class="border-t border-slate-800/60 hover:bg-slate-800/30">
-                <td class="td text-slate-400 whitespace-nowrap"><%= new Date(m.date).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) %></td>
-                <td class="td whitespace-nowrap"><a href="/operations/<%= m.operation %>" class="font-mono text-blue-300 hover:text-blue-200"><%= m.reference %></a><div class="text-[11px] text-slate-500"><%= typeLabels[m.operationType] %></div></td>
-                <td class="td"><a href="/moves<%= buildQuery(query, { product: m.product ? m.product._id : '', page: null }) %>" class="text-white hover:text-blue-300"><%= m.product ? m.product.name : '—' %></a></td>
-                <td class="td text-slate-300 whitespace-nowrap"><%= m.fromLocation.fullName %> <span class="text-slate-500">→</span> <%= m.toLocation.fullName %></td>
-                <td class="td text-right tabular-nums font-semibold <%= tone %>"><%= dir %> <%= fmtQty(m.quantity) %> <span class="text-xs font-normal text-slate-500"><%= m.product ? m.product.uom : '' %></span></td>
-                <td class="td text-right tabular-nums text-slate-400"><%= cost ? fmtMoney(m.quantity * cost) : '—' %></td>
-                <% if (balances) { %><td class="td text-right tabular-nums text-white"><%= fmtQty(balances.get(String(m._id))) %></td><% } %>
-                <td class="td text-slate-400"><%= m.user ? m.user.name : '—' %></td>
+            <% g.rows.forEach((m) => { const dir = direction(m); const tone = toneOf(dir).text; const cost = m.product ? m.product.unitCost || 0 : 0; %>
+              <tr>
+                <td class="td text-muted whitespace-nowrap font-mono text-[0.8125rem]"><%= timeOf(m.date) %></td>
+                <td class="td whitespace-nowrap"><a href="/operations/<%= m.operation %>" class="ref"><%= m.reference %></a><div class="text-[11px] text-muted mt-0.5"><%= typeLabels[m.operationType] %></div></td>
+                <td class="td"><a href="/moves<%= buildQuery(query, { product: m.product ? m.product._id : '', page: null }) %>" class="font-medium hover:text-accent-text"><%= m.product ? m.product.name : '—' %></a></td>
+                <td class="td whitespace-nowrap font-mono text-[0.8125rem] text-ink-2"><%= m.fromLocation.fullName %> <span class="text-muted">→</span> <%= m.toLocation.fullName %></td>
+                <td class="td text-right font-mono tabular font-semibold <%= tone %>"><%= dir %> <%= fmtQty(m.quantity) %> <span class="font-sans text-xs font-normal text-muted"><%= m.product ? m.product.uom : '' %></span></td>
+                <td class="td text-right font-mono tabular text-muted"><%= cost ? fmtMoney(m.quantity * cost) : '—' %></td>
+                <% if (balances) { %><td class="td text-right font-mono tabular font-semibold"><%= fmtQty(balances.get(String(m._id))) %></td><% } %>
+                <td class="td text-muted"><%= m.user ? m.user.name : '—' %></td>
               </tr>
             <% }) %>
           </tbody>
         <% }) %>
       </table>
     </div>
+
+    <!-- Timeline view -->
+    <div class="hidden p-4 sm:p-6 space-y-8" data-moves-pane="timeline">
+      <% groups.forEach((g) => { %>
+        <section aria-label="<%= fmtDate(g.date) %>">
+          <h2 class="sticky top-16 z-10 -mx-1 px-1 py-1.5 bg-surface/90 backdrop-blur text-sm font-semibold">
+            <%= fmtDate(g.date) %> <span class="font-normal text-muted">· <%= fmtRelativeDays(g.date) %> · <%= g.rows.length %> move<%= g.rows.length === 1 ? '' : 's' %></span>
+          </h2>
+          <ol class="timeline mt-3 space-y-3">
+            <% g.rows.forEach((m) => { const dir = direction(m); const t = toneOf(dir); %>
+              <li class="relative pl-12" data-reveal>
+                <span class="absolute left-0 top-2 w-9 h-9 rounded-xl flex items-center justify-center font-mono font-bold ring-4 ring-surface <%= t.bubble %>"><%= dir %></span>
+                <div class="rounded-xl border border-line bg-surface-2 px-4 py-3 transition-colors hover:border-line-2 hover:bg-surface">
+                  <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                    <p class="text-sm">
+                      <span class="font-mono font-semibold <%= t.text %>"><%= dir %><%= fmtQty(m.quantity) %></span>
+                      <span class="text-muted"><%= m.product ? m.product.uom : '' %></span>
+                      <a href="/moves<%= buildQuery(query, { product: m.product ? m.product._id : '', page: null }) %>" class="font-semibold hover:text-accent-text"><%= m.product ? m.product.name : '—' %></a>
+                    </p>
+                    <p class="font-mono text-xs text-muted"><%= timeOf(m.date) %></p>
+                  </div>
+                  <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                    <span class="sku"><%= m.fromLocation.fullName %></span>
+                    <%- icon('arrowRight', 'w-3.5 h-3.5 text-muted') %>
+                    <span class="sku"><%= m.toLocation.fullName %></span>
+                    <span class="mx-1 text-line-2" aria-hidden="true">|</span>
+                    <span class="inline-flex items-center gap-1 text-muted"><%- icon(typeIcons[m.operationType] || 'box', 'w-3.5 h-3.5') %> <a href="/operations/<%= m.operation %>" class="ref !text-xs"><%= m.reference %></a></span>
+                    <% if (m.user) { %><span class="text-muted">by <%= m.user.name %></span><% } %>
+                    <% if (balances) { %><span class="ml-auto badge badge-neutral badge-plain">balance <span class="font-mono"><%= fmtQty(balances.get(String(m._id))) %></span></span><% } %>
+                  </div>
+                </div>
+              </li>
+            <% }) %>
+          </ol>
+        </section>
+      <% }) %>
+    </div>
     <%- include('../partials/pagination', { pagination, query, noun: 'moves' }) %>
   <% } %>
 </div>
+
+<script>
+  (() => {
+    // Table / timeline switch (remembered on this device)
+    const KEY = 'stocksense:moves-view';
+    const apply = (view) => {
+      document.querySelectorAll('[data-moves-view]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.movesView === view)));
+      document.querySelectorAll('[data-moves-pane]').forEach((p) => p.classList.toggle('hidden', p.dataset.movesPane !== view));
+    };
+    let view = 'table';
+    try { view = localStorage.getItem(KEY) || 'table'; } catch (e) {}
+    apply(view);
+    document.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-moves-view]');
+      if (!b) return;
+      view = b.dataset.movesView;
+      try { localStorage.setItem(KEY, view); } catch (err) {}
+      apply(view);
+    });
+    // Live refresh re-renders both panes: keep the chosen one visible
+    document.addEventListener('stocksense:regions-updated', () => apply(view));
+  })();
+</script>
 
 <%- include('../layout/app-bottom') %>

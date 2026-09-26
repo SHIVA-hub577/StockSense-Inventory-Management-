@@ -1,7 +1,8 @@
 /**
  * Scan & Pick input: USB/Bluetooth barcode scanners (they type + Enter),
  * manual entry, or the device camera (html5-qrcode, loaded on demand).
- * Gives instant feedback: beep / buzz, vibration, coloured flash, scan log.
+ * Gives instant feedback: beep / buzz, vibration, laser sweep, coloured flash
+ * (shake on errors) and a scan log.
  *
  *   window.StockSenseScanner.attach({ form, input, quantity?, log, cameraButton, cameraBox,
  *                                     onCode: async (code, qty) => ({ message, done? }) })
@@ -9,7 +10,7 @@
 (function () {
   'use strict';
 
-  const CAMERA_LIB = 'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js';
+  const CAMERA_LIB = '/vendor/html5-qrcode/html5-qrcode.min.js';
   let audioCtx = null;
 
   function tone(ok) {
@@ -43,6 +44,7 @@
   function attach(opts) {
     const { form, input, quantity, log, cameraButton, cameraBox, onCode } = opts;
     const panel = form.closest('section') || form;
+    const cameraLabel = cameraButton ? cameraButton.innerHTML : '';
     let queue = Promise.resolve();
     let lastCode = null;
     let lastAt = 0;
@@ -50,11 +52,12 @@
 
     const addLog = (ok, text) => {
       const li = document.createElement('li');
-      li.className = `flex items-start gap-2 ${ok ? 'text-emerald-300' : 'text-red-300'}`;
+      li.className = `flex items-start gap-2.5 rounded-lg px-3 py-2 animate-fade-up ${ok ? 'bg-ok-soft text-ok' : 'bg-bad-soft text-bad'}`;
       const mark = document.createElement('span');
       mark.className = 'font-bold';
       mark.textContent = ok ? '✓' : '✕';
       const msg = document.createElement('span');
+      msg.className = 'font-medium text-ink-2';
       msg.textContent = text;
       li.append(mark, msg);
       log.prepend(li);
@@ -62,10 +65,15 @@
     };
 
     const flash = (ok) => {
-      panel.classList.remove('ring-2', 'ring-emerald-500/60', 'ring-red-500/60');
-      void panel.offsetWidth; // restart the transition
-      panel.classList.add('ring-2', ok ? 'ring-emerald-500/60' : 'ring-red-500/60');
-      setTimeout(() => panel.classList.remove('ring-2', 'ring-emerald-500/60', 'ring-red-500/60'), 700);
+      panel.classList.remove('scan-ok', 'scan-bad');
+      form.classList.remove('is-scanning', 'animate-shake');
+      void panel.offsetWidth; // restart the animations
+      panel.classList.add(ok ? 'scan-ok' : 'scan-bad');
+      form.classList.add(ok ? 'is-scanning' : 'animate-shake');
+      setTimeout(() => {
+        panel.classList.remove('scan-ok', 'scan-bad');
+        form.classList.remove('is-scanning', 'animate-shake');
+      }, 700);
     };
 
     function handle(rawCode, { fromCamera = false } = {}) {
@@ -113,6 +121,7 @@
         });
         await camera.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 280, height: 140 } }, (text) => handle(text, { fromCamera: true }));
         cameraButton.textContent = 'Stop camera';
+        cameraBox.classList.add('animate-fade-up');
       } catch (err) {
         camera = null;
         cameraBox.classList.add('hidden');
@@ -131,7 +140,7 @@
       }
       camera = null;
       cameraBox.classList.add('hidden');
-      cameraButton.textContent = 'Use camera';
+      cameraButton.innerHTML = cameraLabel;
     }
 
     if (cameraButton) {

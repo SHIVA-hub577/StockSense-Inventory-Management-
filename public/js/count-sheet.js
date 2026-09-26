@@ -1,12 +1,16 @@
 /**
  * Stock count sheet: counted vs recorded quantities per product at one
- * location, with live difference / value and a reason per line.
+ * location, with live difference / value and a reason per line. Works like a
+ * spreadsheet: Enter / arrow keys move between the "Counted" cells, rows are
+ * marked matching / over / short, and a progress bar tracks what is counted.
  */
 (function () {
   'use strict';
 
   const config = JSON.parse(document.getElementById('countFormData').textContent);
-  const { api, toast, toastAfterNavigation, setBusy } = window.StockSense;
+  const { api, toast, toastAfterNavigation, setBusy, combobox } = window.StockSense;
+  const progressText = document.getElementById('countProgress');
+  const progressBar = document.getElementById('countProgressBar');
 
   const form = document.getElementById('countForm');
   const tbody = document.getElementById('lines');
@@ -71,47 +75,55 @@
     const have = product && recordedFor ? recorded[product._id] || 0 : null;
 
     tr.recordedCell.textContent = have === null ? '—' : `${fmt(have)} ${product.uom}`;
-    tr.diffCell.className = 'td text-right tabular-nums whitespace-nowrap';
-    tr.valueCell.className = 'td text-right tabular-nums whitespace-nowrap';
+    tr.diffCell.className = 'td text-right font-mono tabular whitespace-nowrap';
+    tr.valueCell.className = 'td text-right font-mono tabular whitespace-nowrap';
     if (have === null || counted === null || !Number.isFinite(counted)) {
       tr.diffCell.textContent = '—';
       tr.valueCell.textContent = '—';
       tr.dataset.value = '0';
+      tr.dataset.state = counted === null ? '' : 'counted';
       return;
     }
     const diff = Math.round((counted - have) * 1000) / 1000;
     const value = diff * (product.unitCost || 0);
     tr.diffCell.textContent = diff === 0 ? '0' : `${diff > 0 ? '+' : ''}${fmt(diff)}`;
     tr.valueCell.textContent = diff === 0 ? '—' : money(value);
-    const tone = diff > 0 ? 'text-emerald-400' : diff < 0 ? 'text-red-400' : 'text-slate-400';
+    const tone = diff > 0 ? 'text-ok' : diff < 0 ? 'text-bad' : 'text-muted';
     tr.diffCell.classList.add(tone, 'font-semibold');
     tr.valueCell.classList.add(tone);
     tr.dataset.value = String(value);
+    tr.dataset.state = diff === 0 ? 'match' : diff > 0 ? 'over' : 'under';
   }
 
   function updateAll() {
     rows().forEach(updateRow);
     const total = rows().reduce((sum, tr) => sum + Number(tr.dataset.value || 0), 0);
     totalValue.textContent = money(total);
-    totalValue.className = `td text-right font-semibold tabular-nums whitespace-nowrap ${total < 0 ? 'text-red-400' : total > 0 ? 'text-emerald-400' : 'text-slate-300'}`;
+    totalValue.className = `td text-right font-mono font-semibold tabular whitespace-nowrap border-t border-line-2 ${total < 0 ? 'text-bad' : total > 0 ? 'text-ok' : ''}`;
+    // Progress: lines with a product and a counted quantity
+    const withProduct = rows().filter((tr) => tr.product.value);
+    const done = withProduct.filter((tr) => tr.counted.value !== '').length;
+    if (progressText) progressText.textContent = withProduct.length ? `${done} of ${withProduct.length} counted` : 'Nothing on the sheet yet';
+    if (progressBar) progressBar.style.width = `${withProduct.length ? (done / withProduct.length) * 100 : 0}%`;
     const hide = hideRecorded();
     document.querySelectorAll('[data-recorded-only]').forEach((el) => el.classList.toggle('hidden', hide));
   }
 
   function addLine(line = {}) {
     const tr = document.createElement('tr');
-    tr.className = 'border-t border-slate-800';
+    tr.className = 'animate-fade-up';
     tr.product = productSelect(line.product);
     tr.counted = document.createElement('input');
-    Object.assign(tr.counted, { type: 'number', min: '0', step: 'any', className: 'input tabular-nums', placeholder: 'Count' });
+    Object.assign(tr.counted, { type: 'number', min: '0', step: 'any', className: 'sheet-input', placeholder: 'Count' });
+    tr.counted.dataset.sheetCell = '';
     tr.counted.setAttribute('aria-label', 'Counted quantity');
     tr.counted.value = line.quantity !== undefined && line.quantity !== null ? line.quantity : '';
     tr.reason = reasonSelect(line.reason);
-    tr.recordedCell = cell('td text-right tabular-nums text-slate-400');
+    tr.recordedCell = cell('td text-right font-mono tabular text-muted whitespace-nowrap');
     tr.recordedCell.dataset.recordedOnly = '';
-    tr.diffCell = cell('td text-right tabular-nums');
+    tr.diffCell = cell('td text-right font-mono tabular');
     tr.diffCell.dataset.recordedOnly = '';
-    tr.valueCell = cell('td text-right tabular-nums');
+    tr.valueCell = cell('td text-right font-mono tabular');
     tr.valueCell.dataset.recordedOnly = '';
 
     const productCell = cell();
@@ -123,9 +135,9 @@
     const removeCell = cell('td text-right');
     const remove = document.createElement('button');
     remove.type = 'button';
-    remove.className = 'btn btn-secondary btn-sm';
+    remove.className = 'btn btn-ghost btn-icon btn-sm text-muted hover:!text-bad';
     remove.setAttribute('aria-label', 'Remove line');
-    remove.textContent = '✕';
+    remove.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>';
     removeCell.appendChild(remove);
 
     tr.append(productCell, tr.recordedCell, countedCell, tr.diffCell, tr.valueCell, reasonCell, removeCell);
@@ -137,6 +149,7 @@
       updateAll();
     });
     tbody.appendChild(tr);
+    tr.combo = combobox(tr.product, { placeholder: 'Search product or SKU…', emptyText: 'No product matches' });
     updateAll();
     return tr;
   }
@@ -181,7 +194,9 @@
 
   function showError(message) {
     errorBox.textContent = message;
-    errorBox.classList.remove('hidden');
+    errorBox.classList.remove('hidden', 'animate-shake');
+    void errorBox.offsetWidth;
+    errorBox.classList.add('animate-shake');
     errorBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
@@ -247,7 +262,26 @@
     window.location.href = `/operations/${operation._id}`;
   });
 
-  document.getElementById('addLine').addEventListener('click', () => addLine().product.focus());
+  document.getElementById('addLine').addEventListener('click', () => addLine().combo.focus());
+
+  // Spreadsheet keys: Enter / Down = next row, Shift+Enter / Up = previous row
+  tbody.addEventListener('keydown', (e) => {
+    if (!e.target.matches('[data-sheet-cell]')) return;
+    const cells = [...tbody.querySelectorAll('[data-sheet-cell]')];
+    const at = cells.indexOf(e.target);
+    let next = null;
+    if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'ArrowDown') next = at + 1;
+    else if ((e.key === 'Enter' && e.shiftKey) || e.key === 'ArrowUp') next = at - 1;
+    if (next === null) return;
+    e.preventDefault();
+    if (next >= cells.length && e.key === 'Enter') {
+      addLine().combo.focus(); // Enter on the last row starts a new line
+      return;
+    }
+    const target = cells[Math.max(0, Math.min(cells.length - 1, next))];
+    target.focus();
+    target.select();
+  });
   document.getElementById('loadExpected').addEventListener('click', loadExpected);
   document.getElementById('copyRecorded').addEventListener('click', () => {
     rows().forEach((tr) => {

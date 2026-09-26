@@ -73,6 +73,7 @@ const authorize = (...roles) => {
       if (wantsHtml(req)) {
         return res.status(403).render('error', {
           title: 'Access Denied',
+          statusCode: 403,
           message: `Access denied. Role "${req.user.role}" does not have permission to view this page. Required: ${roles.join(' or ')}.`,
           user: req.user,
         });

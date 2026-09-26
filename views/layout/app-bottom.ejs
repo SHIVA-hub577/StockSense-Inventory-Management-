@@ -1,10 +1,11 @@
-    </main>
-    <footer class="py-5 text-center text-xs text-slate-600">
-      StockSense &copy; <%= new Date().getFullYear() %> • Role-Based Inventory & Warehouse Management System
-    </footer>
-  </div>
+  </main>
+  <footer class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-24 lg:pb-6 flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
+    <span>StockSense &copy; <%= new Date().getFullYear() %> · Role-based inventory &amp; warehouse management</span>
+    <span class="hidden sm:inline">Press <kbd class="kbd">?</kbd> for shortcuts</span>
+  </footer>
 </div>
 
-<div id="toast-root" class="fixed bottom-4 right-4 z-50 w-80 max-w-[calc(100vw-2rem)] space-y-2" aria-live="polite"></div>
+<%- include('mobile-nav') %>
+<div id="toast-root" class="fixed z-[70] bottom-20 lg:bottom-5 right-3 sm:right-5 w-[22rem] max-w-[calc(100vw-1.5rem)] flex flex-col gap-2" aria-live="polite"></div>
 </body>
 </html>

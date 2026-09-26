@@ -1,0 +1,224 @@
+<%- include('layout/app-top') %>
+<%
+  const swatches = [
+    ['canvas', 'Page'], ['surface', 'Card'], ['surface-2', 'Raised'], ['sunken', 'Well'],
+    ['ink', 'Text'], ['ink-2', 'Text 2'], ['muted', 'Muted'], ['faint', 'Faint'],
+    ['line', 'Line'], ['line-2', 'Line 2'], ['accent', 'Safety amber'], ['accent-2', 'Amber 2'],
+    ['ok', 'Done / in stock'], ['warn', 'Waiting / low'], ['bad', 'Canceled / out'], ['info', 'Ready'],
+  ];
+  const iconNames = Object.keys(iconPaths);
+%>
+
+<header class="flex flex-wrap items-end justify-between gap-4">
+  <div>
+    <p class="eyebrow">Dockside design system</p>
+    <h1 class="page-title mt-1">Style guide</h1>
+    <p class="mt-2 max-w-2xl text-sm text-muted">Every screen is built from these tokens and components. Colours switch with the theme, so this page is also the quickest way to check both.</p>
+  </div>
+  <div class="segmented" role="radiogroup" aria-label="Theme">
+    <button type="button" role="radio" data-theme-choice="light"><%- icon('sun', 'w-4 h-4') %> Light</button>
+    <button type="button" role="radio" data-theme-choice="dark"><%- icon('moon', 'w-4 h-4') %> Dark</button>
+    <button type="button" role="radio" data-theme-choice="system"><%- icon('monitor', 'w-4 h-4') %> Auto</button>
+  </div>
+</header>
+
+<!-- Colour -->
+<section class="card p-6 space-y-4" aria-labelledby="sg-colour">
+  <h2 id="sg-colour" class="panel-title">Colour tokens</h2>
+  <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+    <% swatches.forEach(([token, name]) => { %>
+      <div class="space-y-1.5">
+        <div class="h-14 rounded-xl border border-line" style="background: var(--<%= token %>)"></div>
+        <p class="text-xs font-semibold"><%= name %></p>
+        <p class="font-mono text-[0.68rem] text-muted">--<%= token %></p>
+      </div>
+    <% }) %>
+  </div>
+</section>
+
+<div class="grid lg:grid-cols-2 gap-6">
+  <!-- Type -->
+  <section class="card p-6 space-y-4" aria-labelledby="sg-type">
+    <h2 id="sg-type" class="panel-title">Typography</h2>
+    <p class="font-display text-4xl font-bold tracking-tight">Bricolage Grotesque</p>
+    <p class="text-base text-ink-2">IBM Plex Sans for interface text: calm, legible, built for dense data.</p>
+    <p class="font-mono text-sm">IBM Plex Mono · WH/IN/0042 · SKU-STL-ROD · 1,284.00</p>
+    <div class="flex flex-wrap items-center gap-2 pt-2">
+      <span class="sku">STL-ROD-12</span>
+      <a href="#" class="ref">WH/OUT/0007</a>
+      <kbd class="kbd">Ctrl</kbd><kbd class="kbd">K</kbd>
+      <span class="eyebrow">Eyebrow</span>
+    </div>
+  </section>
+
+  <!-- Buttons -->
+  <section class="card p-6 space-y-4" aria-labelledby="sg-buttons">
+    <h2 id="sg-buttons" class="panel-title">Buttons</h2>
+    <div class="flex flex-wrap gap-2">
+      <button type="button" class="btn btn-primary">Primary</button>
+      <button type="button" class="btn btn-accent">Accent</button>
+      <button type="button" class="btn btn-success"><%- icon('check', 'w-4 h-4') %> Validate</button>
+      <button type="button" class="btn btn-secondary">Secondary</button>
+      <button type="button" class="btn btn-ghost">Ghost</button>
+      <button type="button" class="btn btn-danger">Danger</button>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <button type="button" class="btn btn-primary btn-sm">Small</button>
+      <button type="button" class="btn btn-accent btn-lg"><%- icon('plus', 'w-5 h-5') %> Large</button>
+      <button type="button" class="btn btn-secondary btn-icon" aria-label="Print"><%- icon('printer', 'w-5 h-5') %></button>
+      <button type="button" class="btn btn-secondary" disabled>Disabled</button>
+      <button type="button" class="btn btn-primary" id="sgBusy">Try busy state</button>
+    </div>
+  </section>
+</div>
+
+<div class="grid lg:grid-cols-2 gap-6">
+  <!-- Badges -->
+  <section class="card p-6 space-y-4" aria-labelledby="sg-badges">
+    <h2 id="sg-badges" class="panel-title">Status badges</h2>
+    <div class="flex flex-wrap gap-2">
+      <% Object.values(STATUS_META).forEach((m) => { %><span class="badge <%= m.classes %>"><%= m.label %></span><% }) %>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <% Object.values(STOCK_STATUS_META).forEach((m) => { %><span class="badge <%= m.classes %>"><%= m.label %></span><% }) %>
+      <span class="badge badge-accent">Accent</span>
+      <span class="badge badge-neutral badge-plain">Plain</span>
+    </div>
+    <div class="flex flex-wrap items-center gap-3 pt-2">
+      <span class="avatar avatar-manager">MM</span>
+      <span class="avatar avatar-staff">SS</span>
+      <span class="avatar avatar-lg avatar-manager">RM</span>
+      <span class="nav-badge">3</span>
+      <span class="nav-badge nav-badge-accent">5</span>
+      <span class="count-chip">12</span>
+    </div>
+  </section>
+
+  <!-- Feedback -->
+  <section class="card p-6 space-y-4" aria-labelledby="sg-feedback">
+    <h2 id="sg-feedback" class="panel-title">Feedback</h2>
+    <div class="flex flex-wrap gap-2">
+      <button type="button" class="btn btn-secondary btn-sm" data-sg-toast="success">Success toast</button>
+      <button type="button" class="btn btn-secondary btn-sm" data-sg-toast="info">Info toast</button>
+      <button type="button" class="btn btn-secondary btn-sm" data-sg-toast="warning">Warning toast</button>
+      <button type="button" class="btn btn-secondary btn-sm" data-sg-toast="error">Error toast</button>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <button type="button" class="btn btn-secondary btn-sm" id="sgConfirm">Confirm dialog</button>
+      <button type="button" class="btn btn-danger btn-sm" id="sgDanger">Danger dialog</button>
+      <button type="button" class="btn btn-secondary btn-sm" data-open-palette><%- icon('search', 'w-4 h-4') %> Command palette</button>
+    </div>
+    <div class="space-y-2 pt-2" aria-hidden="true">
+      <div class="skeleton h-3 w-3/4"></div>
+      <div class="skeleton h-3 w-1/2"></div>
+    </div>
+    <div class="hazard h-2 rounded-full" aria-hidden="true"></div>
+  </section>
+</div>
+
+<!-- Forms -->
+<section class="card p-6" aria-labelledby="sg-forms">
+  <h2 id="sg-forms" class="panel-title mb-4">Form controls</h2>
+  <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div>
+      <label class="label" for="sgText">Product name</label>
+      <input id="sgText" class="input" placeholder="e.g. Steel Rods" />
+    </div>
+    <div>
+      <label class="label" for="sgSelect">Warehouse</label>
+      <select id="sgSelect" class="input"><option>Main Warehouse</option><option>Overflow</option></select>
+    </div>
+    <div>
+      <label class="label" for="sgNum">Quantity</label>
+      <input id="sgNum" type="number" class="input tabular" value="24" />
+    </div>
+    <div>
+      <label class="label" for="sgDate">Scheduled</label>
+      <input id="sgDate" type="date" class="input" />
+    </div>
+    <div class="sm:col-span-2">
+      <label class="label" for="sgArea">Notes</label>
+      <textarea id="sgArea" class="input" rows="3" placeholder="Anything the team should know"></textarea>
+    </div>
+    <div class="flex items-center gap-4 pt-6">
+      <label class="flex items-center gap-2 text-sm"><input type="checkbox" checked /> Active</label>
+      <label class="flex items-center gap-2 text-sm"><input type="radio" name="sgR" checked /> Units</label>
+      <label class="flex items-center gap-2 text-sm"><input type="radio" name="sgR" /> Boxes</label>
+    </div>
+  </div>
+</section>
+
+<!-- Table -->
+<section class="card overflow-hidden" aria-labelledby="sg-table">
+  <div class="px-5 py-4 flex items-center justify-between border-b border-line">
+    <h2 id="sg-table" class="panel-title">Table</h2>
+    <div class="segmented" role="tablist" aria-label="Example filter">
+      <button type="button" role="tab" aria-selected="true">All <span class="count-chip">3</span></button>
+      <button type="button" role="tab" aria-selected="false">Ready</button>
+      <button type="button" role="tab" aria-selected="false">Late</button>
+    </div>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="table table-hover">
+      <thead><tr><th class="th">Reference</th><th class="th">Partner</th><th class="th">Status</th><th class="th text-right">Qty</th></tr></thead>
+      <tbody>
+        <tr><td class="td"><a href="#" class="ref">WH/IN/0012</a></td><td class="td">Tata Steel</td><td class="td"><span class="badge badge-info">Ready</span></td><td class="td text-right tabular">120</td></tr>
+        <tr><td class="td"><a href="#" class="ref">WH/OUT/0031</a></td><td class="td">Acme Retail</td><td class="td"><span class="badge badge-warn">Waiting</span></td><td class="td text-right tabular">48</td></tr>
+        <tr><td class="td"><a href="#" class="ref">WH/INT/0004</a></td><td class="td text-muted">—</td><td class="td"><span class="badge badge-ok">Done</span></td><td class="td text-right tabular">6</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- Icons -->
+<section class="card p-6 space-y-4" aria-labelledby="sg-icons">
+  <h2 id="sg-icons" class="panel-title">Icons <span class="count-chip ml-1"><%= iconNames.length %></span></h2>
+  <div class="grid grid-cols-3 sm:grid-cols-6 lg:grid-cols-10 gap-2">
+    <% iconNames.forEach((name) => { %>
+      <div class="flex flex-col items-center gap-1.5 rounded-xl border border-line bg-surface-2 py-3 text-ink-2">
+        <%- icon(name, 'w-5 h-5') %>
+        <span class="font-mono text-[0.62rem] text-muted"><%= name %></span>
+      </div>
+    <% }) %>
+  </div>
+</section>
+
+<script>
+  (function () {
+    const { toast, confirmDialog, setBusy } = window.StockSense;
+    const messages = {
+      success: 'WH/IN/0012 validated - stock updated',
+      info: 'Sam packed WH/OUT/0031',
+      warning: 'Safety Gloves will run out in 3 days',
+      error: 'Not enough stock for Steel Rods (need 40, have 12)',
+    };
+    document.querySelectorAll('[data-sg-toast]').forEach((b) =>
+      b.addEventListener('click', () => toast(messages[b.dataset.sgToast], b.dataset.sgToast))
+    );
+    document.getElementById('sgBusy').addEventListener('click', (e) => {
+      const b = e.currentTarget;
+      setBusy(b, true, 'Saving...');
+      setTimeout(() => setBusy(b, false), 1800);
+    });
+    document.getElementById('sgConfirm').addEventListener('click', async () => {
+      const ok = await confirmDialog({
+        title: 'Validate WH/IN/0012?',
+        message: 'Stock will be added to the destination location. This cannot be undone.',
+        confirmLabel: 'Validate',
+        tone: 'success',
+        summary: [
+          { label: 'Lines', value: '3 products' },
+          { label: 'Units in', value: '+168' },
+          { label: 'To', value: 'WH/Stock/A1' },
+        ],
+      });
+      toast(ok ? 'Confirmed' : 'Went back', ok ? 'success' : 'info', 2500);
+    });
+    document.getElementById('sgDanger').addEventListener('click', async () => {
+      const ok = await confirmDialog({ title: 'Cancel WH/OUT/0031?', message: 'The operation will be closed without changing any stock.', confirmLabel: 'Cancel operation', danger: true });
+      toast(ok ? 'Canceled' : 'Kept', ok ? 'error' : 'info', 2500);
+    });
+  })();
+</script>
+
+<%- include('layout/app-bottom') %>

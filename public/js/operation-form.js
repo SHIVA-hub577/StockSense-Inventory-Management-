@@ -1,12 +1,14 @@
 /**
- * Receipt / delivery / transfer form: dynamic product lines with live
- * availability at the source location, then save (and optionally confirm).
+ * Receipt / delivery / transfer form: dynamic product lines (searchable
+ * product picker, - / + quantity steppers) with live availability at the
+ * source location, then save (and optionally confirm).
  */
 (function () {
   'use strict';
 
   const config = JSON.parse(document.getElementById('operationFormData').textContent);
-  const { api, toastAfterNavigation, setBusy } = window.StockSense;
+  const { api, toastAfterNavigation, setBusy, combobox, stepper } = window.StockSense;
+  const totals = document.getElementById('lineTotals');
 
   const form = document.getElementById('operationForm');
   const tbody = document.getElementById('lines');
@@ -64,31 +66,49 @@
     tr.uom.textContent = product ? product.uom : '—';
     if (!config.needsSource) return;
 
-    tr.avail.className = 'td whitespace-nowrap text-sm';
+    tr.avail.className = 'td whitespace-nowrap text-sm font-mono tabular';
     tr.avail.removeAttribute('title');
     if (!product || !sourceSelect.value) {
       tr.avail.textContent = '—';
-      tr.avail.classList.add('text-slate-500');
+      tr.avail.classList.add('text-muted');
       return;
     }
     const have = available[product._id];
     if (have === undefined || have === null) {
       tr.avail.textContent = have === undefined ? '…' : '—';
-      tr.avail.classList.add('text-slate-500');
+      tr.avail.classList.add('text-muted');
       return;
     }
     const need = requested(product._id);
     tr.avail.textContent = `${fmt(have)} ${product.uom}`;
+    const wasShort = tr.dataset.short === '1';
+    tr.dataset.short = need > have ? '1' : '';
     if (need > have) {
-      tr.avail.classList.add('text-red-400', 'font-semibold');
+      tr.avail.classList.add('text-bad', 'font-semibold');
       tr.avail.title = `Short by ${fmt(need - have)} ${product.uom} - the operation will wait for stock`;
       tr.avail.textContent += ' ⚠';
+      if (!wasShort) {
+        tr.avail.classList.add('animate-shake');
+        tr.avail.addEventListener('animationend', () => tr.avail.classList.remove('animate-shake'), { once: true });
+      }
     } else {
-      tr.avail.classList.add('text-emerald-400');
+      tr.avail.classList.add('text-ok');
     }
   }
 
-  const updateAll = () => rows().forEach(updateRow);
+  // "3 products · 52 units" under the lines
+  function updateTotals() {
+    if (!totals) return;
+    const filled = rows().filter((tr) => tr.select.value);
+    const units = filled.reduce((sum, tr) => sum + (Number(tr.qty.value) || 0), 0);
+    const distinct = new Set(filled.map((tr) => tr.select.value)).size;
+    totals.textContent = distinct ? `${distinct} ${distinct === 1 ? 'product' : 'products'} · ${fmt(units)} units` : 'No products yet';
+  }
+
+  const updateAll = () => {
+    rows().forEach(updateRow);
+    updateTotals();
+  };
 
   async function refreshAvailability() {
     if (!config.needsSource) return;
@@ -120,18 +140,18 @@
 
   function addLine(line = {}) {
     const tr = document.createElement('tr');
-    tr.className = 'border-t border-slate-800';
+    tr.className = 'animate-fade-up';
 
     tr.select = productSelect(line.product);
     tr.qty = document.createElement('input');
     tr.qty.type = 'number';
     tr.qty.min = '0';
     tr.qty.step = 'any';
-    tr.qty.className = 'input tabular-nums';
+    tr.qty.className = 'input tabular';
     tr.qty.placeholder = '0';
     tr.qty.setAttribute('aria-label', 'Quantity');
     tr.qty.value = line.quantity !== undefined ? line.quantity : '';
-    tr.uom = cell('td text-sm text-slate-400');
+    tr.uom = cell('td text-sm text-muted');
 
     const productCell = cell();
     productCell.appendChild(tr.select);
@@ -147,9 +167,9 @@
     const removeCell = cell('td text-right');
     const remove = document.createElement('button');
     remove.type = 'button';
-    remove.className = 'btn btn-secondary btn-sm';
+    remove.className = 'btn btn-ghost btn-icon btn-sm text-muted hover:!text-bad';
     remove.setAttribute('aria-label', 'Remove line');
-    remove.textContent = '✕';
+    remove.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>';
     removeCell.appendChild(remove);
     tr.appendChild(removeCell);
 
@@ -159,19 +179,31 @@
     });
     tr.qty.addEventListener('input', updateAll);
     remove.addEventListener('click', () => {
-      tr.remove();
-      if (rows().length === 0) addLine();
-      updateAll();
+      const drop = () => {
+        tr.remove();
+        if (rows().length === 0) addLine();
+        updateAll();
+      };
+      if (window.StockSense.reducedMotion()) return drop();
+      tr.style.transition = 'opacity .18s ease, transform .18s ease';
+      tr.style.opacity = '0';
+      tr.style.transform = 'translateX(12px)';
+      setTimeout(drop, 180);
     });
 
     tbody.appendChild(tr);
+    tr.combo = combobox(tr.select, { placeholder: 'Search product or SKU…', emptyText: 'No product matches' });
+    stepper(tr.qty);
     updateRow(tr);
+    updateTotals();
     return tr;
   }
 
   function showError(message) {
     errorBox.textContent = message;
-    errorBox.classList.remove('hidden');
+    errorBox.classList.remove('hidden', 'animate-shake');
+    void errorBox.offsetWidth;
+    errorBox.classList.add('animate-shake');
     errorBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
@@ -242,7 +274,7 @@
     window.location.href = `/operations/${operation._id}`;
   });
 
-  document.getElementById('addLine').addEventListener('click', () => addLine().select.focus());
+  document.getElementById('addLine').addEventListener('click', () => addLine().combo.focus());
   if (sourceSelect) sourceSelect.addEventListener('change', refreshAvailability);
 
   (config.lines.length ? config.lines : [{}]).forEach((line) => addLine(line));

@@ -54,7 +54,7 @@ let onlineTimer = null;
 const broadcastOnline = () => {
   clearTimeout(onlineTimer);
   onlineTimer = setTimeout(() => {
-    broadcast('online', { users: onlineUsers().map((u) => ({ id: u.id, name: u.name })) });
+    broadcast('online', { users: onlineUsers().map((u) => ({ id: u.id, name: u.name, role: u.role })) });
   }, ONLINE_GRACE_MS);
   if (onlineTimer.unref) onlineTimer.unref();
 };

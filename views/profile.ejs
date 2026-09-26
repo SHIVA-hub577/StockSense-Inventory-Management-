@@ -1,54 +1,70 @@
 <%- include('layout/app-top') %>
-<% const isManager = user.role === 'manager'; %>
+<% const isManager = user.role === 'manager'; const rate = stats.created ? Math.round((stats.validated / stats.created) * 100) : 0; %>
 
-<h1 class="text-2xl font-bold text-white tracking-tight">My profile</h1>
+<header data-reveal>
+  <p class="eyebrow">Account</p>
+  <h1 class="page-title mt-1">My profile</h1>
+</header>
 
-<div class="grid lg:grid-cols-3 gap-6">
-  <section class="card p-6 space-y-5">
-    <div class="flex items-center gap-4">
-      <span class="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold <%= isManager ? 'bg-purple-500/20 text-purple-300' : 'bg-amber-500/20 text-amber-300' %>"><%= initials(user.name) %></span>
-      <div>
-        <p class="text-lg font-bold text-white"><%= user.name %></p>
-        <span class="badge <%= isManager ? 'bg-purple-500/10 text-purple-400 border-purple-500/30' : 'bg-amber-500/10 text-amber-400 border-amber-500/30' %>"><%= isManager ? 'Inventory Manager' : 'Warehouse Staff' %></span>
+<div class="grid lg:grid-cols-3 gap-6 items-start">
+  <!-- Staff ID badge -->
+  <section class="space-y-4" aria-label="ID badge" data-reveal>
+    <div class="relative mx-auto max-w-xs" data-tilt>
+      <div class="mx-auto h-8 w-20 rounded-b-xl bg-line-2" aria-hidden="true"></div>
+      <div class="card overflow-hidden -mt-2">
+        <div class="h-2 hazard" aria-hidden="true"></div>
+        <div class="p-6 text-center space-y-4">
+          <div class="mx-auto w-14 h-3 rounded-full bg-sunken border border-line" aria-hidden="true"></div>
+          <span class="avatar avatar-lg mx-auto !w-20 !h-20 !text-xl <%= isManager ? 'avatar-manager' : 'avatar-staff' %>"><%= initials(user.name) %></span>
+          <div>
+            <p class="font-display text-xl font-bold"><%= user.name %></p>
+            <span class="badge <%= isManager ? 'badge-accent' : 'badge-info' %> mt-1.5"><%= isManager ? 'Inventory Manager' : 'Warehouse Staff' %></span>
+          </div>
+          <dl class="text-left text-sm space-y-2.5 pt-3 border-t border-line">
+            <div class="flex justify-between gap-3"><dt class="text-muted">Email</dt><dd class="font-medium truncate"><%= user.email %></dd></div>
+            <div class="flex justify-between gap-3"><dt class="text-muted">Phone</dt><dd class="font-medium"><%= user.phone || '—' %></dd></div>
+            <div class="flex justify-between gap-3"><dt class="text-muted">Member since</dt><dd class="font-medium"><%= fmtDate(user.createdAt) %></dd></div>
+          </dl>
+          <p class="font-mono text-[0.65rem] tracking-[0.3em] text-muted pt-1">STOCKSENSE · <%= String(user._id).slice(-6).toUpperCase() %></p>
+        </div>
       </div>
     </div>
-    <dl class="space-y-3 text-sm">
-      <div><dt class="text-slate-500">Email</dt><dd class="text-slate-200"><%= user.email %></dd></div>
-      <div><dt class="text-slate-500">Phone</dt><dd class="text-slate-200"><%= user.phone || '—' %></dd></div>
-      <div><dt class="text-slate-500">Member since</dt><dd class="text-slate-200"><%= fmtDate(user.createdAt) %></dd></div>
-    </dl>
-    <div class="pt-4 border-t border-slate-800 flex flex-wrap gap-2">
+    <div class="flex flex-wrap justify-center gap-2">
       <a href="/auth/forgot-password" class="btn btn-secondary btn-sm">Change password</a>
       <a href="/auth/logout" class="btn btn-danger btn-sm"><%- icon('logout', 'w-4 h-4') %> Sign out</a>
     </div>
   </section>
 
   <section class="lg:col-span-2 space-y-6">
-    <div class="grid sm:grid-cols-2 gap-4">
-      <div class="card p-5">
-        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Operations created</p>
-        <p class="mt-2 text-3xl font-bold text-white tabular-nums"><%= stats.created %></p>
+    <div class="grid sm:grid-cols-3 gap-4">
+      <div class="card p-5" data-reveal>
+        <p class="text-xs font-semibold text-muted">Operations created</p>
+        <p class="mt-3 stat-value" data-count-to="<%= stats.created %>"><%= stats.created %></p>
       </div>
-      <div class="card p-5">
-        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Operations validated</p>
-        <p class="mt-2 text-3xl font-bold text-emerald-400 tabular-nums"><%= stats.validated %></p>
+      <div class="card p-5" data-reveal>
+        <p class="text-xs font-semibold text-muted">Operations validated</p>
+        <p class="mt-3 stat-value text-ok" data-count-to="<%= stats.validated %>"><%= stats.validated %></p>
+      </div>
+      <div class="card p-5" data-reveal>
+        <p class="text-xs font-semibold text-muted">Validated / created</p>
+        <p class="mt-3 stat-value"><span data-count-to="<%= rate %>"><%= rate %></span><span class="text-lg text-muted">%</span></p>
       </div>
     </div>
 
-    <div class="card overflow-hidden">
-      <h2 class="px-4 py-3 border-b border-slate-800 text-sm font-semibold text-white">My recent activity</h2>
+    <div class="card overflow-hidden" data-reveal>
+      <div class="panel-head"><h2 class="panel-title">My recent activity</h2></div>
       <% if (recent.length === 0) { %>
-        <p class="p-6 text-sm text-slate-400">No operations yet.</p>
+        <%- include('partials/empty', { art: 'clipboard', title: 'No operations yet', text: 'Operations you create or validate show up here.', compact: true }) %>
       <% } else { %>
         <div class="overflow-x-auto">
-          <table class="min-w-full">
+          <table class="table table-hover">
             <tbody>
               <% recent.forEach((op) => { %>
-                <tr class="border-t first:border-t-0 border-slate-800">
-                  <td class="td"><a href="/operations/<%= op._id %>" class="font-mono text-blue-300 hover:text-blue-200"><%= op.reference %></a></td>
-                  <td class="td text-slate-400"><%= OPERATION_META[op.type].label %><%= op.partner ? ' · ' + op.partner : '' %></td>
+                <tr>
+                  <td class="td"><a href="/operations/<%= op._id %>" class="ref"><%= op.reference %></a></td>
+                  <td class="td text-muted"><%= OPERATION_META[op.type].label %><%= op.partner ? ' · ' + op.partner : '' %></td>
                   <td class="td"><span class="badge <%= STATUS_META[op.status].classes %>"><%= STATUS_META[op.status].label %></span></td>
-                  <td class="td text-slate-500 text-right whitespace-nowrap"><%= fmtDateTime(op.updatedAt) %></td>
+                  <td class="td text-muted text-right whitespace-nowrap"><%= fmtDateTime(op.updatedAt) %></td>
                 </tr>
               <% }) %>
             </tbody>
@@ -57,19 +73,28 @@
       <% } %>
     </div>
 
-    <div class="card p-5 space-y-3">
-      <h2 class="text-sm font-semibold text-white">What your role can do</h2>
-      <ul class="text-sm text-slate-300 space-y-2 list-disc pl-5">
-        <% if (isManager) { %>
-          <li>Create, edit and archive products, categories and reordering rules</li>
-          <li>Run receipts, deliveries and internal transfers</li>
-          <li>Validate inventory adjustments (stock count corrections)</li>
-        <% } else { %>
-          <li>View products, stock levels and forecasts</li>
-          <li>Receive goods, pick/pack/validate deliveries and move stock between locations</li>
-          <li>Count stock - an Inventory Manager validates the adjustment</li>
-        <% } %>
-      </ul>
+    <div class="grid md:grid-cols-2 gap-6">
+      <div class="card p-5 space-y-3" data-reveal>
+        <h2 class="panel-title">What your role can do</h2>
+        <ul class="text-sm text-ink-2 space-y-2">
+          <% (isManager
+            ? ['Create, edit and archive products, categories and reordering rules', 'Run receipts, deliveries and internal transfers', 'Validate inventory adjustments (stock count corrections)']
+            : ['View products, stock levels and forecasts', 'Receive goods, pick/pack/validate deliveries and move stock between locations', 'Count stock - an Inventory Manager validates the adjustment']
+          ).forEach((line) => { %>
+            <li class="flex gap-2.5"><%- icon('check', 'w-4 h-4 mt-0.5 shrink-0 text-ok') %> <%= line %></li>
+          <% }) %>
+        </ul>
+      </div>
+      <div class="card p-5 space-y-3" data-reveal>
+        <h2 class="panel-title">Appearance</h2>
+        <p class="text-sm text-muted">Choose a theme for this device. Auto follows your system setting.</p>
+        <div class="segmented w-full" role="radiogroup" aria-label="Theme">
+          <button type="button" role="radio" data-theme-choice="light" class="flex-1 justify-center"><%- icon('sun', 'w-4 h-4') %> Light</button>
+          <button type="button" role="radio" data-theme-choice="dark" class="flex-1 justify-center"><%- icon('moon', 'w-4 h-4') %> Dark</button>
+          <button type="button" role="radio" data-theme-choice="system" class="flex-1 justify-center"><%- icon('monitor', 'w-4 h-4') %> Auto</button>
+        </div>
+        <p class="text-xs text-muted">Tip: press <kbd class="kbd">Ctrl</kbd> <kbd class="kbd">K</kbd> anywhere to search or run a command.</p>
+      </div>
     </div>
   </section>
 </div>

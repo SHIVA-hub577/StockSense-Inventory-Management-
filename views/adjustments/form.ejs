@@ -12,23 +12,25 @@
   const selectedLocation = isEdit ? idOf(op.sourceLocation) : prefill.location;
 %>
 
-<nav class="text-sm text-slate-500" aria-label="Breadcrumb">
-  <a href="/adjustments" class="hover:text-slate-300">Stock counts</a> <span class="mx-1">/</span>
-  <% if (isEdit) { %><a href="/operations/<%= op._id %>" class="hover:text-slate-300 font-mono"><%= op.reference %></a> <span class="mx-1">/</span> <span class="text-slate-300">Edit</span>
-  <% } else { %><span class="text-slate-300">New count</span><% } %>
+<nav class="flex items-center gap-1.5 text-sm text-muted" aria-label="Breadcrumb">
+  <a href="/adjustments" class="hover:text-ink">Stock counts</a> <%- icon('chevronRight', 'w-3.5 h-3.5') %>
+  <% if (isEdit) { %><a href="/operations/<%= op._id %>" class="hover:text-ink font-mono"><%= op.reference %></a> <%- icon('chevronRight', 'w-3.5 h-3.5') %> <span class="text-ink font-medium">Edit</span>
+  <% } else { %><span class="text-ink font-medium">New count</span><% } %>
 </nav>
 
-<div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+<header class="flex items-center gap-4" data-reveal>
+  <span class="tile w-12 h-12 rounded-2xl bg-ink text-canvas shadow-card"><%- icon('adjustments', 'w-6 h-6') %></span>
   <div>
-    <h1 class="text-2xl font-bold text-white tracking-tight"><%= isEdit ? 'Edit ' + op.reference : 'New stock count' %></h1>
-    <p class="text-sm text-slate-400 mt-1">Count what is physically on the shelf. Differences are booked when an Inventory Manager applies the count.</p>
+    <p class="eyebrow"><%= isEdit ? 'Edit count' : 'New stock count' %></p>
+    <h1 class="page-title mt-0.5"><%= isEdit ? op.reference : 'Count the shelf' %></h1>
+    <p class="text-sm text-muted mt-1">Count what is physically on the shelf. Differences are booked when an Inventory Manager applies the count.</p>
   </div>
-</div>
+</header>
 
 <form id="countForm" class="space-y-6" novalidate>
-  <div id="formError" class="hidden rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300" role="alert"></div>
+  <div id="formError" class="hidden rounded-xl border border-bad/30 bg-bad-soft p-3 text-sm font-medium text-bad" role="alert"></div>
 
-  <section class="card p-6 grid md:grid-cols-3 gap-5">
+  <section class="card p-5 sm:p-6 grid md:grid-cols-3 gap-5" data-reveal>
     <div>
       <label for="location" class="label">Location counted *</label>
       <select id="location" name="location" class="input" required>
@@ -45,9 +47,9 @@
       <input id="scheduledDate" name="scheduledDate" type="date" class="input" value="<%= toDateInput(op.scheduledDate) %>">
     </div>
     <div class="flex items-end">
-      <label class="flex items-start gap-3 rounded-xl border border-slate-700 px-3 py-2.5 w-full cursor-pointer select-none">
-        <input type="checkbox" id="blindCount" class="mt-0.5 accent-blue-500" <%= op.blindCount ? 'checked' : '' %> <%= isManager ? '' : 'disabled' %>>
-        <span class="text-sm text-slate-300">Blind count<span class="block text-xs text-slate-500"><%= isManager ? 'Hide recorded quantities from counters' : 'Set by an Inventory Manager' %></span></span>
+      <label class="flex items-start gap-3 rounded-xl border border-line-2 bg-surface-2 px-3 py-2.5 w-full cursor-pointer select-none <%= isManager ? '' : 'opacity-70 cursor-not-allowed' %>">
+        <input type="checkbox" id="blindCount" class="mt-0.5" <%= op.blindCount ? 'checked' : '' %> <%= isManager ? '' : 'disabled' %>>
+        <span class="text-sm font-medium">Blind count<span class="block text-xs font-normal text-muted"><%= isManager ? 'Hide recorded quantities from counters' : 'Set by an Inventory Manager' %></span></span>
       </label>
     </div>
     <div class="md:col-span-3">
@@ -56,22 +58,28 @@
     </div>
   </section>
 
-  <section class="card overflow-hidden">
-    <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-slate-800">
-      <h2 class="text-sm font-semibold text-white">Count sheet</h2>
+  <section class="card" data-reveal>
+    <div class="panel-head flex-wrap">
+      <div class="min-w-[12rem] flex-1">
+        <h2 class="panel-title">Count sheet</h2>
+        <div class="mt-2 flex items-center gap-3">
+          <span class="h-1.5 flex-1 max-w-[14rem] rounded-full bg-sunken overflow-hidden" aria-hidden="true"><span id="countProgressBar" class="block h-full rounded-full bg-accent transition-[width] duration-500 ease-out-soft" style="width: 0%"></span></span>
+          <span id="countProgress" class="text-xs font-medium text-muted" aria-live="polite">Nothing on the sheet yet</span>
+        </div>
+      </div>
       <div class="flex flex-wrap gap-2">
-        <button type="button" id="loadExpected" class="btn btn-secondary btn-sm">Load products stored here</button>
+        <button type="button" id="loadExpected" class="btn btn-secondary btn-sm"><%- icon('warehouses', 'w-3.5 h-3.5') %> Load products stored here</button>
         <button type="button" id="copyRecorded" class="btn btn-secondary btn-sm" data-recorded-only>Counted = recorded</button>
         <button type="button" id="zeroAll" class="btn btn-secondary btn-sm" title="Start from zero and count by scanning">Start from zero</button>
       </div>
     </div>
-    <div class="overflow-x-auto">
-      <table class="min-w-full">
-        <thead class="bg-slate-900/80">
+    <div class="overflow-x-auto sm:overflow-visible">
+      <table class="table">
+        <thead>
           <tr>
-            <th class="th w-2/5">Product</th>
+            <th class="th w-2/5 min-w-[15rem]">Product</th>
             <th class="th text-right" data-recorded-only>Recorded</th>
-            <th class="th w-36">Counted</th>
+            <th class="th w-36 text-right">Counted</th>
             <th class="th text-right" data-recorded-only>Difference</th>
             <th class="th text-right" data-recorded-only>Value</th>
             <th class="th w-44">Reason</th>
@@ -80,24 +88,25 @@
         </thead>
         <tbody id="lines"></tbody>
         <tfoot data-recorded-only>
-          <tr class="border-t border-slate-700">
-            <td class="td text-right text-slate-400" colspan="3">Net difference value</td>
-            <td class="td"></td>
-            <td class="td text-right font-semibold tabular-nums" id="totalValue">₹0</td>
-            <td class="td" colspan="2"></td>
+          <tr>
+            <td class="td text-right text-muted border-t border-line-2" colspan="3">Net difference value</td>
+            <td class="td border-t border-line-2"></td>
+            <td class="td text-right font-mono font-semibold tabular border-t border-line-2" id="totalValue">₹0</td>
+            <td class="td border-t border-line-2" colspan="2"></td>
           </tr>
         </tfoot>
       </table>
     </div>
-    <div class="px-4 py-3 border-t border-slate-800">
+    <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-line bg-surface-2 rounded-b-2xl">
       <button type="button" id="addLine" class="btn btn-secondary btn-sm"><%- icon('plus', 'w-4 h-4') %> Add product</button>
+      <p class="hidden sm:flex items-center gap-1.5 text-xs text-muted"><kbd class="kbd">Enter</kbd> next row <kbd class="kbd">Shift</kbd>+<kbd class="kbd">Enter</kbd> previous</p>
     </div>
   </section>
 
   <div class="flex flex-col-reverse sm:flex-row justify-end gap-3">
-    <a href="<%= isEdit ? '/operations/' + op._id : '/adjustments' %>" class="btn btn-secondary">Cancel</a>
+    <a href="<%= isEdit ? '/operations/' + op._id : '/adjustments' %>" class="btn btn-ghost">Cancel</a>
     <button type="submit" class="btn btn-secondary" data-submit="draft">Save draft</button>
-    <button type="submit" class="btn btn-primary" data-submit="confirm">Save &amp; submit for approval</button>
+    <button type="submit" class="btn btn-accent" data-submit="confirm" data-magnetic><%- icon('check', 'w-4 h-4') %> Save &amp; submit for approval</button>
   </div>
 </form>
 
@@ -109,6 +118,7 @@
   prefillProduct: prefill.product,
   reasons: REASON_META,
 }) %></script>
+<script src="/js/combobox.js"></script>
 <script src="/js/count-sheet.js"></script>
 
 <%- include('../layout/app-bottom') %>

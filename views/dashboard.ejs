@@ -5,124 +5,176 @@
   const typeOptions = [['', 'All documents'], ['receipt', 'Receipts'], ['delivery', 'Delivery orders'], ['internal', 'Internal transfers'], ['adjustment', 'Stock counts']];
   const statusOptions = [['', 'Pending (open)'], ['draft', 'Draft'], ['waiting', 'Waiting'], ['ready', 'Ready'], ['done', 'Done'], ['canceled', 'Canceled']];
   const opsLabel = ops.statusLabel === 'pending' ? 'pending' : STATUS_META[ops.statusLabel].label.toLowerCase();
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const firstName = String(user.name || '').split(' ')[0];
   const kpis = [
-    { label: 'Products in stock', value: stock.inStock, sub: `of ${stock.products} · ${fmtMoney(stock.value)}`, href: '/products?status=instock', icon: 'products', tone: 'text-white' },
-    { label: 'Low stock', value: stock.low, sub: 'at or below reorder level', href: '/products?status=low', icon: 'warning', tone: stock.low ? 'text-amber-400' : 'text-white' },
-    { label: 'Out of stock', value: stock.out, sub: 'nothing on hand', href: '/products?status=out', icon: 'warning', tone: stock.out ? 'text-red-400' : 'text-white' },
-    { label: 'Receipts', value: ops.receipts, sub: opsLabel, href: '/receipts' + q({ tab: f.status || 'todo' }), icon: 'receipts', tone: 'text-white', type: 'receipt' },
-    { label: 'Deliveries', value: ops.deliveries, sub: opsLabel, href: '/deliveries' + q({ tab: f.status || 'todo' }), icon: 'deliveries', tone: 'text-white', type: 'delivery' },
-    { label: 'Transfers scheduled', value: ops.transfers, sub: opsLabel, href: '/transfers' + q({ tab: f.status || 'todo' }), icon: 'transfers', tone: 'text-white', type: 'internal' },
+    { label: 'Products in stock', value: stock.inStock, sub: `of ${stock.products} · ${fmtMoney(stock.value)}`, href: '/products?status=instock', icon: 'products', tone: '', tile: '' },
+    { label: 'Low stock', value: stock.low, sub: 'at or below reorder level', href: '/products?status=low', icon: 'warning', tone: stock.low ? 'text-warn' : '', tile: stock.low ? 'bg-warn-soft text-warn' : '' },
+    { label: 'Out of stock', value: stock.out, sub: 'nothing on hand', href: '/products?status=out', icon: 'warning', tone: stock.out ? 'text-bad' : '', tile: stock.out ? 'bg-bad-soft text-bad' : '', hazard: stock.out > 0 },
+    { label: 'Receipts', value: ops.receipts, sub: opsLabel, href: '/receipts' + q({ tab: f.status || 'todo' }), icon: 'receipts', type: 'receipt', tone: '', tile: '' },
+    { label: 'Deliveries', value: ops.deliveries, sub: opsLabel, href: '/deliveries' + q({ tab: f.status || 'todo' }), icon: 'deliveries', type: 'delivery', tone: '', tile: '' },
+    { label: 'Transfers scheduled', value: ops.transfers, sub: opsLabel, href: '/transfers' + q({ tab: f.status || 'todo' }), icon: 'transfers', type: 'internal', tone: '', tile: '' },
   ];
-  const columns = [
-    { key: 'toReceive', label: 'To receive', tone: 'text-blue-300' },
-    { key: 'toPick', label: 'To pick', tone: 'text-blue-300' },
-    { key: 'toPack', label: 'To pack', tone: 'text-blue-300' },
-    { key: 'readyToShip', label: 'Ready to ship', tone: 'text-emerald-400' },
-    { key: 'late', label: 'Late', tone: 'text-red-400' },
+  const lanes = [
+    { key: 'toReceive', label: 'To receive', icon: 'receipts', hint: 'Vendor trucks due', rail: 'bg-info' },
+    { key: 'toPick', label: 'To pick', icon: 'scan', hint: 'Walk the racks', rail: 'bg-info' },
+    { key: 'toPack', label: 'To pack', icon: 'box', hint: 'Box and tape', rail: 'bg-accent' },
+    { key: 'readyToShip', label: 'Ready to ship', icon: 'deliveries', hint: 'Waiting at the dock', rail: 'bg-ok' },
   ];
+  const late = board.late;
+  const feedTone = { validated: 'bg-ok', canceled: 'bg-bad', created: 'bg-info', confirmed: 'bg-info', picked: 'bg-accent', packed: 'bg-accent' };
 %>
 
-<div class="flex flex-col xl:flex-row xl:items-end justify-between gap-4">
-  <div>
-    <h1 class="text-2xl font-bold text-white tracking-tight">Inventory overview</h1>
-    <p class="text-sm text-slate-400 mt-1"><%= fmtDate(new Date()) %> · <%= user.role === 'manager' ? 'Inventory Manager' : 'Warehouse Staff' %> view<% if (ops.late) { %> · <a href="/dashboard#board" class="text-red-400 hover:text-red-300"><%= ops.late %> late</a><% } %></p>
+<header class="flex flex-col xl:flex-row xl:items-end justify-between gap-5">
+  <div data-reveal>
+    <p class="eyebrow"><%= fmtDate(new Date()) %> · <%= user.role === 'manager' ? 'Inventory Manager' : 'Warehouse Staff' %> view</p>
+    <h1 class="page-title mt-1.5"><%= greeting %>, <%= firstName %></h1>
+    <p class="mt-1.5 text-sm text-muted">
+      Inventory overview for today
+      <% if (ops.late) { %> · <a href="#board" class="font-semibold text-bad hover:underline underline-offset-4"><%= ops.late %> late</a><% } %>
+    </p>
   </div>
   <!-- Dynamic filters -->
-  <form method="GET" action="/dashboard" id="dashFilters" class="grid grid-cols-2 lg:grid-cols-4 gap-2" aria-label="Dashboard filters">
-    <select name="type" class="input py-2" aria-label="Document type">
+  <form method="GET" action="/dashboard" id="dashFilters" class="grid grid-cols-2 lg:grid-cols-4 gap-2 xl:w-[42rem]" aria-label="Dashboard filters">
+    <select name="type" class="input input-sm" aria-label="Document type">
       <% typeOptions.forEach(([v, l]) => { %><option value="<%= v %>" <%= f.type === v ? 'selected' : '' %>><%= l %></option><% }) %>
     </select>
-    <select name="status" class="input py-2" aria-label="Status">
+    <select name="status" class="input input-sm" aria-label="Status">
       <% statusOptions.forEach(([v, l]) => { %><option value="<%= v %>" <%= f.status === v ? 'selected' : '' %>><%= l %></option><% }) %>
     </select>
-    <select name="warehouse" class="input py-2" aria-label="Warehouse">
+    <select name="warehouse" class="input input-sm" aria-label="Warehouse">
       <option value="">All warehouses</option>
       <% warehouses.forEach((w) => { %><option value="<%= w._id %>" <%= String(w._id) === f.warehouse ? 'selected' : '' %>><%= w.name %></option><% }) %>
     </select>
-    <select name="category" class="input py-2" aria-label="Product category">
+    <select name="category" class="input input-sm" aria-label="Product category">
       <option value="">All categories</option>
       <% categories.forEach((c) => { %><option value="<%= c._id %>" <%= String(c._id) === f.category ? 'selected' : '' %>><%= c.name %></option><% }) %>
     </select>
   </form>
-</div>
+</header>
 
 <!-- KPIs -->
-<section data-live-region="kpis" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 rounded-2xl transition-shadow" aria-label="Key figures">
+<section data-live-region="kpis" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 rounded-2xl" aria-label="Key figures">
   <% kpis.forEach((k) => { const dim = f.type && k.type && k.type !== f.type; %>
-    <a href="<%= k.href %>" class="card p-4 hover:border-slate-600 transition-colors <%= dim ? 'opacity-40' : '' %>">
-      <div class="flex items-center justify-between text-slate-400">
-        <p class="text-xs font-semibold uppercase tracking-wider"><%= k.label %></p>
-        <%- icon(k.icon, 'w-4 h-4') %>
-      </div>
-      <p class="mt-3 text-3xl font-bold tabular-nums <%= k.tone %>"><%= k.value %></p>
-      <p class="text-xs text-slate-500 mt-1 truncate"><%= k.sub %></p>
+    <a href="<%= k.href %>" class="card card-hover group relative overflow-hidden p-4 flex flex-col <%= dim ? 'opacity-40' : '' %>" data-reveal data-tilt>
+      <% if (k.hazard) { %><span class="absolute inset-x-0 top-0 h-1 hazard" aria-hidden="true"></span><% } %>
+      <span class="flex items-start justify-between gap-2">
+        <span class="text-xs font-semibold text-muted leading-tight"><%= k.label %></span>
+        <span class="tile w-8 h-8 rounded-lg <%= k.tile %> transition-transform duration-300 ease-spring group-hover:scale-110 group-hover:-rotate-6"><%- icon(k.icon, 'w-4 h-4') %></span>
+      </span>
+      <span class="stat-value mt-4 <%= k.tone %>" data-count-to="<%= k.value %>"><%= k.value %></span>
+      <span class="mt-1.5 text-xs text-muted truncate"><%= k.sub %></span>
     </a>
   <% }) %>
 </section>
 
-<!-- Today board -->
-<section id="board" class="space-y-3">
-  <div class="flex items-center justify-between">
-    <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Today's work</h2>
-    <a href="/scan" class="text-xs text-blue-400 hover:text-blue-300">Open scanner →</a>
+<!-- Today board: the dock flow, left to right -->
+<section id="board" class="space-y-3" aria-labelledby="boardTitle">
+  <div class="flex items-center justify-between gap-4">
+    <div>
+      <h2 id="boardTitle" class="panel-title">Today's work</h2>
+      <p class="text-xs text-muted">Goods flow from the dock door to the customer</p>
+    </div>
+    <a href="/scan" class="link">Open scanner <%- icon('arrowRight', 'w-4 h-4') %></a>
   </div>
-  <div data-live-region="board" class="grid sm:grid-cols-2 xl:grid-cols-5 gap-4 rounded-2xl transition-shadow">
-    <% columns.forEach((col) => { const c = board[col.key]; %>
-      <div class="card p-4 space-y-3 min-h-[9rem]">
-        <div class="flex items-center justify-between">
-          <p class="text-sm font-semibold <%= col.tone %>"><%= col.label %></p>
-          <span class="text-xs font-bold rounded-full px-2 py-0.5 <%= c.count ? (col.key === 'late' ? 'bg-red-500/15 text-red-300' : 'bg-slate-800 text-slate-200') : 'bg-slate-800/50 text-slate-500' %>"><%= c.count %></span>
+  <div data-live-region="board" class="grid gap-4 xl:grid-cols-[repeat(4,minmax(0,1fr))_minmax(0,0.9fr)] sm:grid-cols-2 rounded-2xl">
+    <% lanes.forEach((lane, i) => { const c = board[lane.key]; %>
+      <div class="card relative p-4 flex flex-col gap-3 min-h-[10rem]" data-reveal>
+        <span class="absolute left-4 right-4 top-0 h-[3px] rounded-b-full <%= lane.rail %> <%= c.count ? '' : 'opacity-30' %>" aria-hidden="true"></span>
+        <div class="flex items-center gap-2.5">
+          <span class="tile w-8 h-8 rounded-lg"><%- icon(lane.icon, 'w-4 h-4') %></span>
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-semibold leading-tight"><%= lane.label %></p>
+            <p class="text-[0.7rem] text-muted"><%= lane.hint %></p>
+          </div>
+          <span class="count-chip <%= c.count ? '!bg-ink !text-canvas' : '' %>"><%= c.count %></span>
         </div>
         <% if (c.items.length === 0) { %>
-          <p class="text-xs text-slate-500"><%= col.key === 'late' ? 'Nothing late' : 'All clear' %></p>
+          <p class="mt-auto flex items-center gap-1.5 text-xs text-muted"><%- icon('check', 'w-3.5 h-3.5 text-ok') %> All clear</p>
         <% } else { %>
-          <ul class="space-y-2">
+          <ul class="space-y-1.5">
             <% c.items.forEach((op) => { %>
               <li>
-                <a href="/operations/<%= op._id %>" class="block rounded-lg px-2 py-1.5 -mx-2 hover:bg-slate-800/60">
-                  <span class="font-mono text-xs text-blue-300"><%= op.reference %></span>
-                  <span class="block text-xs text-slate-400 truncate"><%= op.partner || OPERATION_META[op.type].label %> · <%= fmtRelativeDays(op.scheduledDate) %></span>
+                <a href="/operations/<%= op._id %>" class="group/t block rounded-lg border border-line bg-surface-2 px-2.5 py-2 transition-colors hover:border-line-2 hover:bg-surface">
+                  <span class="flex items-center justify-between gap-2">
+                    <span class="font-mono text-xs font-semibold"><%= op.reference %></span>
+                    <span class="text-[0.68rem] <%= isLate(op) ? 'text-bad font-semibold' : 'text-muted' %>"><%= fmtRelativeDays(op.scheduledDate) %></span>
+                  </span>
+                  <span class="block text-xs text-muted truncate"><%= op.partner || OPERATION_META[op.type].label %></span>
                 </a>
               </li>
             <% }) %>
           </ul>
-          <% if (c.count > c.items.length) { %><p class="text-xs text-slate-500">+<%= c.count - c.items.length %> more</p><% } %>
+          <% if (c.count > c.items.length) { %><p class="text-xs text-muted">+<%= c.count - c.items.length %> more</p><% } %>
         <% } %>
       </div>
     <% }) %>
+    <div class="card relative overflow-hidden p-4 flex flex-col gap-3 min-h-[10rem] <%= late.count ? 'border-bad/40' : '' %>" data-reveal>
+      <% if (late.count) { %><span class="absolute inset-0 hazard-soft pointer-events-none" aria-hidden="true"></span><% } %>
+      <div class="relative flex items-center gap-2.5">
+        <span class="tile w-8 h-8 rounded-lg <%= late.count ? 'bg-bad-soft text-bad' : '' %>"><%- icon('warning', 'w-4 h-4') %></span>
+        <div class="min-w-0 flex-1">
+          <p class="text-sm font-semibold leading-tight <%= late.count ? 'text-bad' : '' %>">Late</p>
+          <p class="text-[0.7rem] text-muted">Past their scheduled date</p>
+        </div>
+        <span class="count-chip <%= late.count ? '!bg-bad !text-canvas' : '' %>"><%= late.count %></span>
+      </div>
+      <% if (late.items.length === 0) { %>
+        <p class="relative mt-auto flex items-center gap-1.5 text-xs text-muted"><%- icon('check', 'w-3.5 h-3.5 text-ok') %> Nothing late</p>
+      <% } else { %>
+        <ul class="relative space-y-1.5">
+          <% late.items.forEach((op) => { %>
+            <li>
+              <a href="/operations/<%= op._id %>" class="block rounded-lg border border-bad/25 bg-surface px-2.5 py-2 transition-colors hover:border-bad/50">
+                <span class="flex items-center justify-between gap-2">
+                  <span class="font-mono text-xs font-semibold"><%= op.reference %></span>
+                  <span class="text-[0.68rem] font-semibold text-bad"><%= fmtRelativeDays(op.scheduledDate) %></span>
+                </span>
+                <span class="block text-xs text-muted truncate"><%= op.partner || OPERATION_META[op.type].label %></span>
+              </a>
+            </li>
+          <% }) %>
+        </ul>
+        <% if (late.count > late.items.length) { %><p class="relative text-xs text-muted">+<%= late.count - late.items.length %> more</p><% } %>
+      <% } %>
+    </div>
   </div>
 </section>
 
 <div class="grid xl:grid-cols-3 gap-6">
   <!-- Flow chart -->
-  <section class="card p-5 xl:col-span-2 space-y-4">
-    <div class="flex items-center justify-between">
+  <section class="card xl:col-span-2 self-start" data-reveal aria-labelledby="flowTitle">
+    <div class="panel-head">
       <div>
-        <h2 class="text-sm font-semibold text-white">Stock flow · last 14 days</h2>
-        <p class="text-xs text-slate-500">Value of goods coming in vs going out</p>
+        <h2 id="flowTitle" class="panel-title">Stock flow · last 14 days</h2>
+        <p class="text-xs text-muted">Value of goods coming in vs going out</p>
       </div>
-      <a href="/moves" class="text-xs text-blue-400 hover:text-blue-300">Move history →</a>
+      <a href="/moves" class="link">Move history <%- icon('arrowRight', 'w-4 h-4') %></a>
     </div>
-    <div class="h-64"><canvas id="flowChart" aria-label="Stock value in and out per day" role="img"></canvas></div>
+    <div class="p-4 pt-3"><div class="h-64"><canvas id="flowChart" aria-label="Stock value in and out per day" role="img"></canvas></div></div>
     <div data-live-region="flowdata" hidden><script type="application/json" id="flowData"><%- jsonForScript(chart) %></script></div>
   </section>
 
   <!-- Forecast warnings -->
-  <section class="card overflow-hidden">
-    <div class="flex items-center justify-between px-4 py-3 border-b border-slate-800">
-      <h2 class="text-sm font-semibold text-white">Stock outlook</h2>
-      <a href="/replenishment" class="text-xs text-blue-400 hover:text-blue-300">Replenish →</a>
+  <section class="card overflow-hidden" data-reveal aria-labelledby="outlookTitle">
+    <div class="panel-head">
+      <div>
+        <h2 id="outlookTitle" class="panel-title">Stock outlook</h2>
+        <p class="text-xs text-muted">Forecast for the next 30 days</p>
+      </div>
+      <a href="/replenishment" class="link">Replenish <%- icon('arrowRight', 'w-4 h-4') %></a>
     </div>
-    <ul data-live-region="warnings" class="divide-y divide-slate-800 transition-shadow">
+    <ul data-live-region="warnings" class="divide-y divide-line max-h-[20.5rem] overflow-y-auto">
       <% if (warnings.length === 0) { %>
-        <li class="px-4 py-8 text-center text-sm text-slate-400">Everything is healthy for the next 30 days</li>
+        <li class="empty"><%- icon('check', 'w-8 h-8 text-ok') %> Everything is healthy for the next 30 days</li>
       <% } %>
       <% warnings.forEach(({ product, forecast }) => { const o = OUTLOOK_META[forecast.status]; %>
-        <li class="px-4 py-3 flex items-start justify-between gap-3">
+        <li class="px-4 py-3 flex items-start justify-between gap-3 transition-colors hover:bg-surface-2">
           <div class="min-w-0">
-            <a href="/products/<%= product._id %>" class="block text-sm font-medium text-white hover:text-blue-300 truncate"><%= product.name %></a>
-            <p class="text-xs text-slate-400">
-              <%= fmtQty(forecast.onHand) %> <%= product.uom %> left
+            <a href="/products/<%= product._id %>" class="block text-sm font-semibold truncate hover:text-accent-text"><%= product.name %></a>
+            <p class="text-xs text-muted">
+              <span class="font-mono"><%= fmtQty(forecast.onHand) %></span> <%= product.uom %> left
               <% if (forecast.stockoutDate && forecast.status !== 'out') { %>· runs out <%= fmtRelativeDays(forecast.stockoutDate) %><% } %>
               <% if (forecast.orderByDate) { %>· order <%= new Date(forecast.orderByDate) <= new Date() ? 'now' : 'by ' + fmtDate(forecast.orderByDate) %><% } %>
             </p>
@@ -136,23 +188,23 @@
 
 <div class="grid xl:grid-cols-3 gap-6">
   <!-- Operations (all four filters) -->
-  <section class="card overflow-hidden xl:col-span-2">
-    <div class="flex items-center justify-between px-4 py-3 border-b border-slate-800">
-      <h2 class="text-sm font-semibold text-white">Operations <span class="font-normal text-slate-500">· most recently updated</span></h2>
+  <section class="card overflow-hidden xl:col-span-2" data-reveal aria-labelledby="opsTitle">
+    <div class="panel-head">
+      <h2 id="opsTitle" class="panel-title">Operations <span class="font-normal text-muted">· most recently updated</span></h2>
     </div>
-    <div data-live-region="operations" class="overflow-x-auto transition-shadow">
+    <div data-live-region="operations" class="overflow-x-auto">
       <% if (operations.length === 0) { %>
-        <p class="px-4 py-8 text-center text-sm text-slate-400">No operations match these filters</p>
+        <p class="empty">No operations match these filters</p>
       <% } else { %>
-        <table class="min-w-full">
-          <thead class="bg-slate-900/80"><tr><th class="th">Reference</th><th class="th">Type</th><th class="th">Partner / route</th><th class="th">Scheduled</th><th class="th">Status</th></tr></thead>
+        <table class="table table-hover">
+          <thead><tr><th class="th">Reference</th><th class="th">Type</th><th class="th">Partner / route</th><th class="th">Scheduled</th><th class="th">Status</th></tr></thead>
           <tbody>
             <% operations.forEach((op) => { %>
-              <tr class="border-t border-slate-800 hover:bg-slate-800/30">
-                <td class="td"><a href="/operations/<%= op._id %>" class="font-mono text-blue-300 hover:text-blue-200"><%= op.reference %></a></td>
-                <td class="td text-slate-400"><%= OPERATION_META[op.type].label %></td>
-                <td class="td text-slate-300 truncate max-w-[16rem]"><%= op.type === 'adjustment' ? `Count · ${op.sourceLocation.fullName}` : op.partner || `${op.sourceLocation.fullName} → ${op.destLocation.fullName}` %></td>
-                <td class="td whitespace-nowrap <%= isLate(op) ? 'text-red-400' : 'text-slate-400' %>"><%= fmtDate(op.scheduledDate) %></td>
+              <tr>
+                <td class="td"><a href="/operations/<%= op._id %>" class="ref"><%= op.reference %></a></td>
+                <td class="td text-muted whitespace-nowrap"><%= OPERATION_META[op.type].label %></td>
+                <td class="td truncate max-w-[16rem]"><%= op.type === 'adjustment' ? `Count · ${op.sourceLocation.fullName}` : op.partner || `${op.sourceLocation.fullName} → ${op.destLocation.fullName}` %></td>
+                <td class="td whitespace-nowrap <%= isLate(op) ? 'text-bad font-semibold' : 'text-muted' %>"><%= fmtDate(op.scheduledDate) %></td>
                 <td class="td"><span class="badge <%= STATUS_META[op.status].classes %>"><%= STATUS_META[op.status].label %></span></td>
               </tr>
             <% }) %>
@@ -163,21 +215,21 @@
   </section>
 
   <!-- Live activity -->
-  <section class="card overflow-hidden">
-    <div class="flex items-center justify-between px-4 py-3 border-b border-slate-800">
-      <h2 class="text-sm font-semibold text-white">Live activity</h2>
-      <span class="flex items-center gap-1.5 text-xs text-emerald-400"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>live</span>
+  <section class="card overflow-hidden" data-reveal aria-labelledby="feedTitle">
+    <div class="panel-head">
+      <h2 id="feedTitle" class="panel-title">Live activity</h2>
+      <span class="flex items-center gap-1.5 text-xs font-semibold text-ok"><span class="w-1.5 h-1.5 rounded-full bg-ok animate-pulse-dot"></span>live</span>
     </div>
-    <ul id="activityFeed" class="divide-y divide-slate-800 max-h-[26rem] overflow-y-auto">
+    <ul id="activityFeed" class="divide-y divide-line max-h-[26rem] overflow-y-auto">
       <% if (feed.length === 0) { %>
-        <li id="activityEmpty" class="px-4 py-8 text-center text-sm text-slate-400">Nothing yet - actions by anyone appear here instantly</li>
+        <li id="activityEmpty" class="empty">Nothing yet - actions by anyone appear here instantly</li>
       <% } %>
       <% feed.forEach((a) => { %>
         <li class="px-4 py-3 flex gap-3">
-          <span class="mt-1.5 w-2 h-2 shrink-0 rounded-full <%= a.action === 'validated' ? 'bg-emerald-400' : a.action === 'canceled' ? 'bg-red-400' : 'bg-slate-500' %>"></span>
+          <span class="mt-1.5 w-2 h-2 shrink-0 rounded-full <%= feedTone[a.action] || 'bg-line-2' %>"></span>
           <div class="min-w-0">
-            <a href="/operations/<%= a.subject %>" class="block text-sm text-slate-200 hover:text-white"><%= a.message %></a>
-            <p class="text-xs text-slate-500"><%= fmtAgo(a.createdAt) %></p>
+            <a href="/operations/<%= a.subject %>" class="block text-sm text-ink hover:text-accent-text"><%= a.message %></a>
+            <p class="text-xs text-muted"><%= fmtAgo(a.createdAt) %></p>
           </div>
         </li>
       <% }) %>
@@ -185,7 +237,8 @@
   </section>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="/vendor/chart.js/chart.umd.min.js"></script>
+<script src="/js/charts.js"></script>
 <script>
   (() => {
     // Filters apply as soon as they change
@@ -198,8 +251,11 @@
 
     let chart;
     const money = (v) => Number(v).toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
+    const compact = (v) => Number(v).toLocaleString('en-IN', { style: 'currency', currency: 'INR', notation: 'compact', maximumFractionDigits: 1 });
     function drawChart() {
       if (!window.Chart) return;
+      const { colors, alpha } = window.StockSense.charts;
+      const c = colors();
       const data = JSON.parse(document.getElementById('flowData').textContent);
       const labels = data.map((d) => new Date(d.day + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }));
       if (chart) chart.destroy();
@@ -208,25 +264,27 @@
         data: {
           labels,
           datasets: [
-            { label: 'In', data: data.map((d) => d.in), backgroundColor: 'rgba(52, 211, 153, 0.75)', borderRadius: 4 },
-            { label: 'Out', data: data.map((d) => d.out), backgroundColor: 'rgba(248, 113, 113, 0.75)', borderRadius: 4 },
+            { label: 'In', data: data.map((d) => d.in), backgroundColor: alpha(c.ok, 0.8), hoverBackgroundColor: c.ok, borderRadius: 6, borderSkipped: false, maxBarThickness: 18 },
+            { label: 'Out', data: data.map((d) => d.out), backgroundColor: alpha(c.bad, 0.75), hoverBackgroundColor: c.bad, borderRadius: 6, borderSkipped: false, maxBarThickness: 18 },
           ],
         },
         options: {
           maintainAspectRatio: false,
-          animation: { duration: 300 },
+          animation: { duration: 600, easing: 'easeOutQuart' },
+          interaction: { mode: 'index', intersect: false },
           plugins: {
-            legend: { labels: { color: '#94a3b8', boxWidth: 12 } },
-            tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${money(c.parsed.y)}` } },
+            legend: { position: 'top', align: 'end' },
+            tooltip: { callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${money(ctx.parsed.y)}` } },
           },
           scales: {
-            x: { ticks: { color: '#64748b' }, grid: { display: false } },
-            y: { ticks: { color: '#64748b', callback: (v) => money(v) }, grid: { color: 'rgba(148, 163, 184, 0.1)' } },
+            x: { grid: { display: false }, border: { display: false } },
+            y: { border: { display: false }, grid: { color: c.line }, ticks: { callback: (v) => compact(v), maxTicksLimit: 5 } },
           },
         },
       });
     }
     drawChart();
+    window.StockSense.charts.onTheme(drawChart);
     document.addEventListener('stocksense:regions-updated', drawChart);
   })();
 </script>

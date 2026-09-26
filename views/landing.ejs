@@ -1,175 +1,275 @@
-<%- include('layout/header') %>
+<%- include('layout/head', { bodyClass: 'landing overflow-x-hidden' }) %>
+<%
+  const steps = [
+    { n: '01', title: 'Receive', head: 'Trucks back in. Stock counts itself in.', text: 'Check goods in by scanning each carton at the dock. Receipts post to the ledger the moment they are validated, so on-hand is right before the truck even leaves.', chip: 'WH/IN/0042 · 3 products · +168 units', icon: 'receipts' },
+    { n: '02', title: 'Store', head: 'Every pallet has an address.', text: 'Racks, bins and zones per warehouse. Move stock between them with internal transfers and see each location as a live floor plan.', chip: 'WH/Rack B · 12 products · ₹4.2L', icon: 'warehouses' },
+    { n: '03', title: 'Pick & pack', head: 'Scan, pick, tape. No guessing.', text: 'Delivery orders walk the picker to the right bin. Scan to confirm, mark packed, and the forecast updates for everyone at once.', chip: 'Picked 4/4 · Packed by Sam', icon: 'scan' },
+    { n: '04', title: 'Ship', head: 'Out the door, into the ledger.', text: 'Validate and the truck is gone: stock leaves the source location, low-stock alerts fire, and replenishment suggests what to reorder.', chip: 'WH/OUT/0107 · Shipped · 2 min ago', icon: 'deliveries' },
+  ];
+%>
+<script src="/js/app.js"></script>
 
-<div class="min-h-full flex flex-col justify-between">
-  <!-- Navigation Bar -->
-  <nav class="border-b border-slate-800/80 bg-slate-950/70 backdrop-blur-md sticky top-0 z-50">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-      <div class="flex items-center space-x-3">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-blue-500/30">
-          SS
+<!-- 3D warehouse: in the hero on phones, fixed beside the story on desktop -->
+<header id="landingNav" class="fixed inset-x-0 top-0 z-50 transition-[background-color,box-shadow,border-color] duration-300 border-b border-transparent">
+  <div class="max-w-7xl mx-auto h-16 px-4 sm:px-6 lg:px-8 flex items-center gap-3">
+    <a href="/" class="flex items-center gap-2.5 mr-auto" aria-label="StockSense home">
+      <%- include('partials/logo', { cls: 'w-8 h-8' }) %>
+      <span class="font-display text-[1.15rem] font-bold tracking-tight">StockSense</span>
+    </a>
+    <nav class="hidden md:flex items-center gap-1 text-sm font-medium text-ink-2" aria-label="Sections">
+      <a href="#story" class="px-3 py-2 rounded-lg hover:bg-sunken hover:text-ink transition-colors">How it works</a>
+      <a href="#features" class="px-3 py-2 rounded-lg hover:bg-sunken hover:text-ink transition-colors">Features</a>
+      <a href="#roles" class="px-3 py-2 rounded-lg hover:bg-sunken hover:text-ink transition-colors">Roles</a>
+    </nav>
+    <button id="themeToggle" type="button" class="btn btn-ghost btn-icon" aria-label="Toggle dark theme">
+      <span class="dark:hidden"><%- icon('moon', 'w-5 h-5') %></span>
+      <span class="hidden dark:inline"><%- icon('sun', 'w-5 h-5') %></span>
+    </button>
+    <a href="/auth/login" class="btn btn-ghost hidden sm:inline-flex">Sign in</a>
+    <a href="/auth/signup" class="btn btn-primary" data-magnetic>Get started</a>
+  </div>
+</header>
+
+<main id="main-content">
+  <!-- Hero -->
+  <section id="hero" class="relative min-h-[100svh] pt-24 pb-12 lg:pb-16 flex flex-col justify-center">
+    <div class="absolute inset-0 floor opacity-70 pointer-events-none" aria-hidden="true"></div>
+    <div class="relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="lg:w-[46%] space-y-7">
+        <p class="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink-2 shadow-card" data-hero-in>
+          <span class="w-2 h-2 rounded-full bg-ok animate-pulse-dot"></span> Live inventory for real warehouses
+        </p>
+        <h1 class="font-display font-bold tracking-[-0.045em] leading-[0.98] text-[clamp(2.6rem,1.6rem+4.2vw,5.2rem)] text-balance" data-split>
+          Every box, every bin, <em class="not-italic text-accent-text">always in sight.</em>
+        </h1>
+        <p class="max-w-xl text-lg text-ink-2 leading-relaxed" data-hero-in>
+          StockSense runs receipts, deliveries, transfers and stock counts on one live ledger. Scan at the dock, watch the warehouse move in real time, and know what runs out before it does.
+        </p>
+        <div class="flex flex-col sm:flex-row gap-3" data-hero-in>
+          <a href="/auth/signup" class="btn btn-accent btn-lg" data-magnetic>Start for free <%- icon('arrowRight', 'w-5 h-5') %></a>
+          <a href="/auth/login" class="btn btn-secondary btn-lg">Sign in to your warehouse</a>
         </div>
-        <span class="text-xl font-extrabold text-white tracking-tight">StockSense</span>
-      </div>
-
-      <div class="flex items-center space-x-4">
-        <a 
-          href="/auth/login" 
-          class="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800/60 transition-all border border-transparent hover:border-slate-700"
-        >
-          Sign In
-        </a>
-        <a 
-          href="/auth/signup" 
-          class="px-5 py-2.5 rounded-xl text-sm font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/25 hover:from-blue-500 hover:to-indigo-500 transition-all"
-        >
-          Register Now
-        </a>
+        <dl class="grid grid-cols-3 gap-4 max-w-md pt-2" data-hero-in>
+          <div><dt class="text-xs text-muted">Operation types</dt><dd class="font-display text-2xl font-bold" data-count-to="4">4</dd></div>
+          <div><dt class="text-xs text-muted">Live update</dt><dd class="font-display text-2xl font-bold">&lt;1s</dd></div>
+          <div><dt class="text-xs text-muted">Spreadsheets</dt><dd class="font-display text-2xl font-bold">0</dd></div>
+        </dl>
       </div>
     </div>
-  </nav>
-
-  <!-- Hero Section -->
-  <section class="py-20 lg:py-28 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-center space-y-8 relative overflow-hidden">
-    <!-- Glowing background accent -->
-    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-blue-600/15 blur-[120px] rounded-full pointer-events-none"></div>
-
-    <div class="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20 shadow-inner">
-      <span class="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
-      <span>Next-Gen Inventory & Warehouse Control Platform</span>
+    <div id="stage3d" class="stage3d" aria-hidden="true">
+      <div class="stage3d-fallback">
+        <%- include('partials/logo', { cls: 'w-16 h-16' }) %>
+      </div>
     </div>
-
-    <h1 class="text-4xl sm:text-6xl lg:text-7xl font-black text-white tracking-tight max-w-4xl mx-auto leading-tight sm:leading-tight">
-      Eliminate Inventory Chaos. <br />
-      <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-300 to-purple-400">
-        Empower Your Team.
-      </span>
-    </h1>
-
-    <p class="text-base sm:text-xl text-slate-300 max-w-2xl mx-auto font-normal leading-relaxed">
-      StockSense bridges the gap between high-level inventory managers and hands-on warehouse staff with real-time tracking, role-based workflows, and automated security.
-    </p>
-
-    <!-- CTAs -->
-    <div class="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-      <a 
-        href="/auth/signup" 
-        class="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-base shadow-xl shadow-blue-600/30 hover:from-blue-500 hover:to-indigo-500 transition-all flex items-center justify-center group"
-      >
-        <span>Get Started — It's Free</span>
-        <svg class="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
-        </svg>
-      </a>
-      <a 
-        href="/auth/login" 
-        class="w-full sm:w-auto px-8 py-4 rounded-xl bg-slate-900/90 text-slate-200 hover:text-white font-bold text-base border border-slate-700 hover:border-slate-500 transition-all flex items-center justify-center"
-      >
-        Sign In to Account
-      </a>
-    </div>
+    <a href="#story" class="hidden lg:flex absolute bottom-6 left-1/2 -translate-x-1/2 flex-col items-center gap-1 text-xs font-medium text-muted hover:text-ink" aria-label="Scroll to how it works">
+      Scroll <span class="scroll-cue" aria-hidden="true"></span>
+    </a>
   </section>
 
-  <!-- Problems Solved Section -->
-  <section class="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-12">
-    <div class="text-center space-y-3">
-      <h2 class="text-xs font-bold tracking-widest text-blue-400 uppercase">Why StockSense?</h2>
-      <p class="text-3xl font-extrabold text-white tracking-tight sm:text-4xl">Common Inventory Pitfalls We Solve</p>
-      <p class="text-sm text-slate-400 max-w-xl mx-auto">Traditional inventory spreadsheets lead to stockouts, misplaced orders, and unauthorized changes. StockSense replaces confusion with clarity.</p>
-    </div>
-
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-
-      <!-- Feature Card 1 -->
-      <div class="glass-card rounded-2xl p-8 space-y-4 border border-slate-800/80 hover:border-blue-500/40 transition-all">
-        <div class="w-12 h-12 rounded-xl bg-rose-500/10 text-rose-400 flex items-center justify-center text-xl font-bold border border-rose-500/20">
-          ⚠️
+  <!-- Scroll story: the 3D warehouse follows along -->
+  <section id="story" class="relative" aria-label="How it works">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="lg:w-[42%] relative">
+        <div class="hidden lg:block absolute -left-8 top-[15vh] bottom-[15vh] w-px bg-line" aria-hidden="true">
+          <span id="storyRail" class="absolute left-0 top-0 w-px bg-accent origin-top" style="height: 100%; transform: scaleY(0)"></span>
         </div>
-        <h3 class="text-lg font-bold text-white">Prevent Stockouts & Overstocking</h3>
-        <p class="text-sm text-slate-400 leading-relaxed">
-          Stop losing money on expired goods or missing sales due to empty shelves. Track exact quantities, threshold alerts, and stock values across all locations.
-        </p>
-      </div>
-
-      <!-- Feature Card 2 -->
-      <div class="glass-card rounded-2xl p-8 space-y-4 border border-slate-800/80 hover:border-blue-500/40 transition-all">
-        <div class="w-12 h-12 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center text-xl font-bold border border-indigo-500/20">
-          👥
-        </div>
-        <h3 class="text-lg font-bold text-white">Unified Single-Login Role Access</h3>
-        <p class="text-sm text-slate-400 leading-relaxed">
-          No duplicate login systems needed. A single signup assigns users as <strong>Inventory Managers</strong> or <strong>Warehouse Staff</strong> with precise route-level authorization.
-        </p>
-      </div>
-
-      <!-- Feature Card 3 -->
-      <div class="glass-card rounded-2xl p-8 space-y-4 border border-slate-800/80 hover:border-blue-500/40 transition-all">
-        <div class="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-xl font-bold border border-emerald-500/20">
-          📦
-        </div>
-        <h3 class="text-lg font-bold text-white">Streamlined Goods Operations</h3>
-        <p class="text-sm text-slate-400 leading-relaxed">
-          Floor staff can execute physical goods receiving, picking/packing, internal location moves, and stock counts without risking unauthorized settings changes.
-        </p>
-      </div>
-
-      <!-- Feature Card 4 -->
-      <div class="glass-card rounded-2xl p-8 space-y-4 border border-slate-800/80 hover:border-blue-500/40 transition-all">
-        <div class="w-12 h-12 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center text-xl font-bold border border-purple-500/20">
-          🔐
-        </div>
-        <h3 class="text-lg font-bold text-white">Instant OTP Password Recovery</h3>
-        <p class="text-sm text-slate-400 leading-relaxed">
-          Never get locked out of your warehouse system. Receive 6-digit verification OTPs directly in your email via Nodemailer integration.
-        </p>
-      </div>
-
-      <!-- Feature Card 5 -->
-      <div class="glass-card rounded-2xl p-8 space-y-4 border border-slate-800/80 hover:border-blue-500/40 transition-all">
-        <div class="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center text-xl font-bold border border-amber-500/20">
-          ⚡
-        </div>
-        <h3 class="text-lg font-bold text-white">Real-Time Data Consistency</h3>
-        <p class="text-sm text-slate-400 leading-relaxed">
-          Powered by MongoDB Atlas & Express, ensure that inventory movements reflect instantly for both decision-makers and warehouse workers.
-        </p>
-      </div>
-
-      <!-- Feature Card 6 -->
-      <div class="glass-card rounded-2xl p-8 space-y-4 border border-slate-800/80 hover:border-blue-500/40 transition-all">
-        <div class="w-12 h-12 rounded-xl bg-teal-500/10 text-teal-400 flex items-center justify-center text-xl font-bold border border-teal-500/20">
-          📊
-        </div>
-        <h3 class="text-lg font-bold text-white">Manager Approval Workflows</h3>
-        <p class="text-sm text-slate-400 leading-relaxed">
-          Managers review physical counts, validate inventory adjustments, and approve purchase requisitions before stock is updated.
-        </p>
-      </div>
-
-    </div>
-  </section>
-
-  <!-- CTA Banner -->
-  <section class="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
-    <div class="glass-card rounded-3xl p-10 sm:p-14 border border-blue-500/30 bg-gradient-to-r from-blue-950/60 via-slate-900 to-indigo-950/60 text-center space-y-6 relative overflow-hidden shadow-2xl">
-      <h2 class="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">Ready to Transform Your Warehouse Operations?</h2>
-      <p class="text-slate-300 max-w-xl mx-auto text-sm sm:text-base">Join StockSense today and start managing your catalog, stock movements, and warehouse staff effortlessly.</p>
-      
-      <div class="pt-2 flex flex-col sm:flex-row items-center justify-center gap-4">
-        <a 
-          href="/auth/signup" 
-          class="px-8 py-3.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-sm shadow-lg shadow-blue-600/30 hover:from-blue-500 hover:to-indigo-500 transition-all"
-        >
-          Create Free Account
-        </a>
-        <a 
-          href="/auth/login" 
-          class="px-8 py-3.5 rounded-xl bg-slate-800 text-slate-200 hover:text-white font-semibold text-sm border border-slate-700 hover:border-slate-500 transition-all"
-        >
-          Already Registered? Sign In
-        </a>
+        <% steps.forEach((s, i) => { %>
+          <article class="story-step min-h-[70vh] lg:min-h-[88vh] flex flex-col justify-center py-12" data-step="<%= i + 1 %>">
+            <p class="flex items-center gap-3 text-sm font-semibold text-accent-text">
+              <span class="font-mono"><%= s.n %></span><span class="h-px w-8 bg-accent" aria-hidden="true"></span><%= s.title %>
+            </p>
+            <h2 class="mt-4 font-display text-[clamp(1.9rem,1.3rem+2vw,3rem)] font-bold leading-[1.05] tracking-[-0.035em]"><%= s.head %></h2>
+            <p class="mt-4 text-lg text-ink-2 leading-relaxed max-w-lg"><%= s.text %></p>
+            <p class="mt-6 inline-flex self-start items-center gap-2.5 rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm shadow-card">
+              <span class="tile w-7 h-7 rounded-lg bg-accent text-accent-ink"><%- icon(s.icon, 'w-4 h-4') %></span>
+              <span class="font-mono text-[0.8125rem] font-medium"><%= s.chip %></span>
+            </p>
+          </article>
+        <% }) %>
       </div>
     </div>
   </section>
 
-  <%- include('layout/footer') %>
-</div>
+  <!-- Bento features -->
+  <section id="features" class="relative z-10 bg-canvas py-24 border-t border-line" aria-labelledby="featuresTitle">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="max-w-2xl" data-reveal>
+        <p class="eyebrow">Features</p>
+        <h2 id="featuresTitle" class="mt-2 font-display text-[clamp(2rem,1.4rem+2vw,3.2rem)] font-bold tracking-[-0.035em] leading-[1.05]">Built for the floor, not the spreadsheet.</h2>
+        <p class="mt-4 text-lg text-ink-2">The things warehouse teams actually do all day, made fast and hard to get wrong.</p>
+      </div>
+
+      <div class="mt-12 grid gap-4 md:grid-cols-6 auto-rows-[minmax(15rem,auto)]">
+        <!-- Live -->
+        <article class="card card-hover relative overflow-hidden p-6 md:col-span-4 flex flex-col" data-reveal data-tilt>
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <h3 class="font-display text-xl font-bold">Live warehouse</h3>
+              <p class="mt-1.5 text-sm text-muted max-w-sm">Every pick, pack and validation shows up for the whole team within a second. See who else is on the same order.</p>
+            </div>
+            <div class="flex -space-x-2" aria-hidden="true">
+              <span class="avatar avatar-sm avatar-ring avatar-manager">MM</span>
+              <span class="avatar avatar-sm avatar-ring avatar-staff">SK</span>
+              <span class="avatar avatar-sm avatar-ring avatar-staff">PR</span>
+            </div>
+          </div>
+          <ul id="bentoFeed" class="mt-5 space-y-2 text-sm" aria-hidden="true">
+            <li class="flex items-center gap-3 rounded-xl border border-line bg-surface-2 px-3 py-2.5"><span class="w-2 h-2 rounded-full bg-ok"></span> <span class="flex-1">Maya validated <span class="font-mono font-semibold">WH/IN/0042</span></span><span class="text-xs text-muted">now</span></li>
+            <li class="flex items-center gap-3 rounded-xl border border-line bg-surface-2 px-3 py-2.5"><span class="w-2 h-2 rounded-full bg-accent"></span> <span class="flex-1">Sam packed <span class="font-mono font-semibold">WH/OUT/0107</span></span><span class="text-xs text-muted">1m</span></li>
+            <li class="flex items-center gap-3 rounded-xl border border-line bg-surface-2 px-3 py-2.5"><span class="w-2 h-2 rounded-full bg-info"></span> <span class="flex-1">Priya moved 12 units to <span class="font-mono font-semibold">WH/Rack B</span></span><span class="text-xs text-muted">3m</span></li>
+          </ul>
+        </article>
+
+        <!-- Scan -->
+        <article class="card card-hover relative overflow-hidden p-6 md:col-span-2 flex flex-col" data-reveal data-tilt>
+          <h3 class="font-display text-xl font-bold">Scan &amp; pick</h3>
+          <p class="mt-1.5 text-sm text-muted">USB scanner, phone camera or keyboard. Every scan beeps, buzzes and ticks the line.</p>
+          <div class="mt-auto pt-5" aria-hidden="true">
+            <div class="scan-bar is-demo relative rounded-xl bg-[#15171b] p-3">
+              <div class="relative flex items-center gap-2 rounded-lg bg-white px-3 h-11 font-mono text-sm text-[#15171b]">
+                <span id="bentoTyping">STL-ROD</span><span class="w-px h-5 bg-[#15171b] animate-pulse"></span>
+                <span class="scan-laser"></span>
+              </div>
+            </div>
+            <p class="mt-2.5 flex items-center gap-2 text-xs font-semibold text-ok">✓ Steel Rods · 3/4 picked</p>
+          </div>
+        </article>
+
+        <!-- Time machine -->
+        <article class="card card-hover relative overflow-hidden p-6 md:col-span-2 flex flex-col" data-reveal data-tilt>
+          <h3 class="font-display text-xl font-bold">Time machine</h3>
+          <p class="mt-1.5 text-sm text-muted">Drag back to any day and see exactly what was on every shelf, rebuilt from the ledger.</p>
+          <div class="mt-auto pt-5" aria-hidden="true">
+            <div class="relative flex items-end gap-[3px] h-16 rounded-xl bg-sunken px-2 pt-2" id="bentoHistogram">
+              <% [3, 5, 2, 7, 4, 9, 6, 3, 8, 5, 10, 4, 7, 6, 9, 5, 8, 11, 6, 7].forEach((v, i) => { %><span class="flex-1 rounded-t-[2px] <%= i < 12 ? 'bg-accent' : 'bg-line-2' %>" style="height: <%= v * 9 %>%"></span><% }) %>
+              <span class="bento-playhead absolute -bottom-1 w-3 h-5 rounded bg-ink border-2 border-accent" style="left: 58%"></span>
+            </div>
+          </div>
+        </article>
+
+        <!-- Forecast -->
+        <article class="card card-hover relative overflow-hidden p-6 md:col-span-2 flex flex-col" data-reveal data-tilt>
+          <div class="flex items-center justify-between gap-2">
+            <h3 class="font-display text-xl font-bold">Stockout forecast</h3>
+            <span class="badge badge-warn">6 days left</span>
+          </div>
+          <p class="mt-1.5 text-sm text-muted">Usage, confirmed orders and supplier lead time become a date: order by Friday.</p>
+          <svg class="mt-auto pt-4 w-full h-24" viewBox="0 0 200 70" fill="none" aria-hidden="true">
+            <path d="M0 58 H200" stroke-width="1" stroke-dasharray="3 3" style="stroke: var(--bad)" opacity=".5"/>
+            <path class="bento-line" d="M0 22 L20 18 L40 26 L60 20 L80 30 L100 28 L120 36" style="stroke: var(--ink)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path class="bento-dash" d="M120 36 L140 42 L160 50 L180 58 L200 66" style="stroke: var(--accent)" stroke-width="2.5" stroke-dasharray="5 5" stroke-linecap="round"/>
+            <circle cx="180" cy="58" r="4" style="fill: var(--bad)"/>
+          </svg>
+        </article>
+
+        <!-- Replenishment -->
+        <article class="card card-hover relative overflow-hidden p-6 md:col-span-2 flex flex-col" data-reveal data-tilt>
+          <h3 class="font-display text-xl font-bold">One-click replenishment</h3>
+          <p class="mt-1.5 text-sm text-muted">Low products grouped by supplier into draft receipts, sized to cover lead time. Nothing ordered twice.</p>
+          <div class="mt-auto pt-5 flex items-center gap-3" aria-hidden="true">
+            <% ['Tata Steel', 'Acme Office', 'PackRight'].forEach((s, i) => { %>
+              <span class="bento-po flex-1 rounded-xl border border-line bg-surface-2 p-2.5 text-center" style="--i: <%= i %>">
+                <span class="block mx-auto w-7 h-5 rounded-[3px] border-2 border-ink relative"><span class="absolute inset-x-0 top-0 h-2.5 border-b-2 border-ink [clip-path:polygon(0_0,100%_0,50%_100%)]"></span></span>
+                <span class="mt-1.5 block text-[0.68rem] font-semibold truncate"><%= s %></span>
+              </span>
+            <% }) %>
+          </div>
+        </article>
+
+        <!-- Palette -->
+        <article class="card card-hover relative overflow-hidden p-6 md:col-span-3 flex flex-col" data-reveal data-tilt>
+          <h3 class="font-display text-xl font-bold">Everything is one keystroke away</h3>
+          <p class="mt-1.5 text-sm text-muted">Press <kbd class="kbd">Ctrl</kbd> <kbd class="kbd">K</kbd> to jump to any product, reference or bin, or use <kbd class="kbd">G</kbd> then a letter to fly between screens.</p>
+          <div class="mt-auto pt-5" aria-hidden="true">
+            <div class="rounded-xl border border-line bg-surface shadow-card overflow-hidden">
+              <div class="flex items-center gap-2 px-3 h-11 border-b border-line text-sm"><%- icon('search', 'w-4 h-4 text-muted') %> <span>rack b</span><span class="ml-auto kbd">Esc</span></div>
+              <div class="p-1.5 text-sm">
+                <div class="menu-item !bg-sunken"><%- icon('map', 'w-4 h-4') %> <span class="font-mono font-semibold">WH/Rack B</span><span class="ml-auto text-xs text-muted">↵</span></div>
+                <div class="menu-item"><%- icon('transfers', 'w-4 h-4') %> <span class="font-mono font-semibold">WH/INT/0009</span><span class="ml-auto badge badge-info">Ready</span></div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Labels -->
+        <article class="card card-hover relative overflow-hidden p-6 md:col-span-3 flex flex-col" data-reveal data-tilt>
+          <h3 class="font-display text-xl font-bold">Print it, stick it, scan it</h3>
+          <p class="mt-1.5 text-sm text-muted">Code 128 labels for products, bins and documents. Print a whole rack's bin labels in one go.</p>
+          <div class="mt-auto pt-5 flex gap-3" aria-hidden="true">
+            <% ['STL-ROD', 'WH/Rack B', 'WH/OUT/0107'].forEach((code, i) => { %>
+              <div class="flex-1 rounded-lg border border-dashed border-line-2 border-t-4 !border-t-accent bg-white p-2.5 text-[#15171b] <%= i === 2 ? 'hidden sm:block' : '' %>" style="rotate: <%= [-2, 1.5, -1][i] %>deg">
+                <svg class="w-full h-9" viewBox="0 0 60 20" preserveAspectRatio="none"><% for (let k = 0; k < 26; k++) { const w = (k * 7 + i * 3) % 3 === 0 ? 2 : 1; %><rect x="<%= k * 2.3 %>" y="0" width="<%= w %>" height="20" fill="#15171b"/><% } %></svg>
+                <p class="mt-1 font-mono text-[0.62rem] font-semibold truncate"><%= code %></p>
+              </div>
+            <% }) %>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- Roles -->
+  <section id="roles" class="relative z-10 bg-canvas pb-24" aria-labelledby="rolesTitle">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-2 gap-10 items-center">
+      <div data-reveal>
+        <p class="eyebrow">Two roles, one login</p>
+        <h2 id="rolesTitle" class="mt-2 font-display text-[clamp(2rem,1.4rem+2vw,3.2rem)] font-bold tracking-[-0.035em] leading-[1.05]">Managers decide. Staff move boxes. Nobody steps on toes.</h2>
+        <p class="mt-4 text-lg text-ink-2">Stock counts are approved by a manager before they touch the books. Staff get a fast, focused floor app.</p>
+      </div>
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div class="card p-6" data-reveal data-tilt>
+          <span class="avatar avatar-lg avatar-manager">IM</span>
+          <h3 class="mt-4 font-display text-lg font-bold">Inventory Manager</h3>
+          <ul class="mt-3 space-y-2 text-sm text-ink-2">
+            <li class="flex gap-2"><%- icon('check', 'w-4 h-4 mt-0.5 text-ok shrink-0') %> Products, categories, reorder rules</li>
+            <li class="flex gap-2"><%- icon('check', 'w-4 h-4 mt-0.5 text-ok shrink-0') %> Approves stock counts</li>
+            <li class="flex gap-2"><%- icon('check', 'w-4 h-4 mt-0.5 text-ok shrink-0') %> Warehouses, racks and bins</li>
+          </ul>
+        </div>
+        <div class="card p-6" data-reveal data-tilt>
+          <span class="avatar avatar-lg avatar-staff">WS</span>
+          <h3 class="mt-4 font-display text-lg font-bold">Warehouse Staff</h3>
+          <ul class="mt-3 space-y-2 text-sm text-ink-2">
+            <li class="flex gap-2"><%- icon('check', 'w-4 h-4 mt-0.5 text-ok shrink-0') %> Receive, pick, pack, ship</li>
+            <li class="flex gap-2"><%- icon('check', 'w-4 h-4 mt-0.5 text-ok shrink-0') %> Move stock between bins</li>
+            <li class="flex gap-2"><%- icon('check', 'w-4 h-4 mt-0.5 text-ok shrink-0') %> Count shelves (blind if asked)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Final CTA -->
+  <section class="relative z-10 bg-canvas pb-24" aria-labelledby="ctaTitle">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="relative overflow-hidden rounded-[2rem] bg-[#15171b] text-[#f1f0ec] px-6 py-14 sm:px-14 sm:py-20" data-reveal>
+        <div class="absolute inset-x-0 top-0 h-2.5 hazard" aria-hidden="true"></div>
+        <div class="absolute -right-24 -bottom-24 w-96 h-96 rounded-full bg-[#ffb020] opacity-20 blur-3xl" aria-hidden="true"></div>
+        <div class="relative max-w-2xl">
+          <h2 id="ctaTitle" class="font-display text-[clamp(2rem,1.3rem+2.4vw,3.6rem)] font-bold tracking-[-0.04em] leading-[1.02]">Open the dock doors.</h2>
+          <p class="mt-4 text-lg text-[#c9cbcf]">Set up a warehouse in a minute, invite your team, and scan your first receipt today.</p>
+          <div class="mt-8 flex flex-col sm:flex-row gap-3">
+            <a href="/auth/signup" class="btn btn-accent btn-lg" data-magnetic>Create your account <%- icon('arrowRight', 'w-5 h-5') %></a>
+            <a href="/auth/login" class="btn btn-lg bg-white/10 text-white border-white/20 hover:bg-white/15">Sign in</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="relative z-10 bg-canvas border-t border-line">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-muted">
+    <span class="flex items-center gap-2"><%- include('partials/logo', { cls: 'w-5 h-5' }) %> StockSense &copy; <%= new Date().getFullYear() %></span>
+    <span>Role-based inventory &amp; warehouse management</span>
+  </div>
+</footer>
+
+<script src="/vendor/gsap/gsap.min.js" defer></script>
+<script src="/vendor/gsap/ScrollTrigger.min.js" defer></script>
+<script src="/vendor/lenis/lenis.min.js" defer></script>
+<script src="/js/motion.js" defer></script>
+<script src="/js/landing.js" defer></script>
+<script type="module" src="/js/landing3d.js"></script>
+</body>
+</html>

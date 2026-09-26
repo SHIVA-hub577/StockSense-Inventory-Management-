@@ -1,30 +1,46 @@
 <%- include('../layout/app-top') %>
 
 <div class="max-w-2xl mx-auto space-y-6">
-  <div>
-    <h1 class="text-2xl font-bold text-white tracking-tight flex items-center gap-2"><%- icon('scan', 'w-7 h-7 text-blue-400') %> Scan anything</h1>
-    <p class="text-sm text-slate-400 mt-1">Scan a product, a location label or a document barcode to open it. Works with USB scanners, the camera, or typing.</p>
-  </div>
+  <header class="text-center" data-reveal>
+    <p class="eyebrow">Scan & Pick</p>
+    <h1 class="page-title mt-1">Scan anything</h1>
+    <p class="text-sm text-muted mt-2 max-w-md mx-auto">Scan a product, a location label or a document barcode to open it. Works with USB scanners, the camera, or typing.</p>
+  </header>
 
-  <section class="card p-5 space-y-4" aria-label="Scanner">
-    <div class="flex justify-end">
-      <button type="button" id="cameraToggle" class="btn btn-secondary btn-sm"><%- icon('scan', 'w-4 h-4') %> Use camera</button>
+  <section class="card p-5 sm:p-7 space-y-5" aria-label="Scanner" data-reveal>
+    <div class="viewfinder rounded-2xl bg-[#15171b] p-5 sm:p-6 text-[#f1f0ec]">
+      <div class="flex items-center justify-between gap-3 mb-4">
+        <p class="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#c9cbcf]"><span class="w-2 h-2 rounded-full bg-[#ff6b6b]"></span> Ready to scan</p>
+        <button type="button" id="cameraToggle" class="btn btn-sm bg-white/10 text-white border-white/20 hover:bg-white/20"><%- icon('scan', 'w-4 h-4') %> Use camera</button>
+      </div>
+      <form id="scanForm" class="scan-bar flex gap-2" autocomplete="off">
+        <div class="relative flex-1">
+          <input id="scanInput" class="input h-14 font-mono text-lg" placeholder="SKU, bin (WH/Rack A) or reference" aria-label="Code">
+          <span class="scan-laser" aria-hidden="true"></span>
+        </div>
+        <button type="submit" class="btn btn-accent h-14 px-6">Open</button>
+      </form>
     </div>
-    <form id="scanForm" class="flex gap-2" autocomplete="off">
-      <input id="scanInput" class="input font-mono text-lg flex-1" placeholder="SKU, location (e.g. WH/Rack A) or reference" aria-label="Code">
-      <button type="submit" class="btn btn-primary">Open</button>
-    </form>
-    <div id="scanCamera" class="hidden rounded-xl overflow-hidden border border-slate-700"></div>
-    <ul id="scanLog" class="space-y-1 text-sm" aria-live="polite"></ul>
+    <div id="scanCamera" class="hidden rounded-xl overflow-hidden border border-line"></div>
+    <ul id="scanLog" class="space-y-1.5 text-sm" aria-live="polite"></ul>
   </section>
 
-  <section class="card p-5 text-sm text-slate-400 space-y-2">
-    <p class="font-semibold text-white">Tips</p>
-    <ul class="list-disc pl-5 space-y-1">
-      <li>Print labels from a product page, <a href="/settings/warehouses" class="text-blue-400 hover:text-blue-300">Warehouses</a> (bin labels) or any document's print view.</li>
-      <li>On an open receipt, delivery or count, use its own scan box to pick or count items.</li>
-      <li>Phone cameras need the app served over HTTPS (localhost works on the same machine).</li>
-    </ul>
+  <section class="grid sm:grid-cols-3 gap-3 text-sm" aria-label="Tips" data-reveal>
+    <div class="card p-4">
+      <span class="tile w-8 h-8 rounded-lg mb-2"><%- icon('label', 'w-4 h-4') %></span>
+      <p class="font-semibold">Print labels</p>
+      <p class="mt-1 text-xs text-muted">From a product page, <a href="/settings/warehouses" class="link-inline">Warehouses</a> (bin labels) or any document's print view.</p>
+    </div>
+    <div class="card p-4">
+      <span class="tile w-8 h-8 rounded-lg mb-2"><%- icon('deliveries', 'w-4 h-4') %></span>
+      <p class="font-semibold">Pick &amp; count</p>
+      <p class="mt-1 text-xs text-muted">On an open receipt, delivery or count, use its own scan box to pick or count items.</p>
+    </div>
+    <div class="card p-4">
+      <span class="tile w-8 h-8 rounded-lg mb-2"><%- icon('monitor', 'w-4 h-4') %></span>
+      <p class="font-semibold">Camera</p>
+      <p class="mt-1 text-xs text-muted">Phone cameras need the app served over HTTPS (localhost works on the same machine).</p>
+    </div>
   </section>
 </div>
 
@@ -40,7 +56,7 @@
       cameraBox: document.getElementById('scanCamera'),
       onCode: async (code) => {
         const res = await api('GET', `/api/scan/resolve?code=${encodeURIComponent(code)}`);
-        setTimeout(() => { window.location.href = res.data.url; }, 350);
+        setTimeout(() => { window.location.href = res.data.url; }, 450);
         return { message: `Opening ${res.data.label}` };
       },
     });

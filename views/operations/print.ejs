@@ -6,32 +6,38 @@
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <title><%= title %></title>
   <style>
+    @font-face { font-family: 'IBM Plex Sans'; font-weight: 400; src: url('/vendor/fonts/plex-sans/ibm-plex-sans-latin-400-normal.woff2') format('woff2'); }
+    @font-face { font-family: 'IBM Plex Sans'; font-weight: 600; src: url('/vendor/fonts/plex-sans/ibm-plex-sans-latin-600-normal.woff2') format('woff2'); }
+    @font-face { font-family: 'IBM Plex Sans'; font-weight: 700; src: url('/vendor/fonts/plex-sans/ibm-plex-sans-latin-700-normal.woff2') format('woff2'); }
+    @font-face { font-family: 'IBM Plex Mono'; font-weight: 500; src: url('/vendor/fonts/plex-mono/ibm-plex-mono-latin-500-normal.woff2') format('woff2'); }
+    @font-face { font-family: 'Bricolage Grotesque'; font-weight: 200 800; src: url('/vendor/fonts/bricolage/bricolage-grotesque-latin-wght-normal.woff2') format('woff2-variations'); }
     * { box-sizing: border-box; }
-    body { font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; color: #0f172a; background: #f1f5f9; margin: 0; padding: 24px; }
+    body { font-family: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; color: #15171b; background: #f6f5f1; margin: 0; padding: 24px; }
     .page { max-width: 800px; margin: 0 auto; background: #fff; padding: 40px; border-radius: 12px; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08); }
-    header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0f172a; padding-bottom: 16px; }
-    .brand { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
-    .brand small { display: block; font-size: 12px; font-weight: 500; color: #64748b; }
+    header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #15171b; position: relative; padding-bottom: 16px; }
+    .brand { font-family: 'Bricolage Grotesque', 'IBM Plex Sans', sans-serif; font-size: 22px; font-weight: 800; letter-spacing: -0.02em; display: flex; gap: 10px; align-items: flex-start; }
+    .brand svg { width: 34px; height: 34px; flex-shrink: 0; }
+    .brand small { display: block; font-family: 'IBM Plex Sans', sans-serif; font-size: 12px; font-weight: 400; color: #676c75; }
     .doc { text-align: right; }
-    .doc h1 { margin: 0; font-size: 22px; }
-    .doc .ref { font-family: ui-monospace, Consolas, monospace; font-size: 16px; margin-top: 4px; }
-    .status { display: inline-block; margin-top: 6px; padding: 2px 8px; border: 1px solid #94a3b8; border-radius: 6px; font-size: 12px; font-weight: 600; text-transform: uppercase; }
+    .doc h1 { margin: 0; font-family: 'Bricolage Grotesque', 'IBM Plex Sans', sans-serif; font-size: 24px; letter-spacing: -0.02em; }
+    .doc .ref { font-family: 'IBM Plex Mono', ui-monospace, Consolas, monospace; font-size: 16px; margin-top: 4px; }
+    .status { display: inline-block; margin-top: 6px; padding: 2px 8px; border: 1px solid #15171b; background: #fff3d6; border-radius: 6px; font-size: 12px; font-weight: 600; text-transform: uppercase; }
     .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px 32px; margin: 24px 0; font-size: 14px; }
-    .grid dt { color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .grid dt { color: #676c75; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
     .grid dd { margin: 2px 0 0; font-weight: 600; }
     table { width: 100%; border-collapse: collapse; font-size: 14px; }
-    th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: #475569; border-bottom: 1px solid #cbd5e1; padding: 8px; }
-    td { border-bottom: 1px solid #e2e8f0; padding: 10px 8px; }
+    th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: #3e434b; border-bottom: 1px solid #d3cfc4; padding: 8px; background: #fbfaf7; }
+    td { border-bottom: 1px solid #e4e1d9; padding: 10px 8px; }
     .num { text-align: right; font-variant-numeric: tabular-nums; }
-    .mono { font-family: ui-monospace, Consolas, monospace; color: #475569; }
+    .mono { font-family: 'IBM Plex Mono', ui-monospace, Consolas, monospace; color: #3e434b; }
     .check { width: 18px; height: 18px; border: 1.5px solid #64748b; border-radius: 4px; display: inline-block; }
-    .notes { margin-top: 20px; font-size: 14px; background: #f8fafc; border-radius: 8px; padding: 12px; }
+    .notes { margin-top: 20px; font-size: 14px; background: #fbfaf7; border-left: 3px solid #ffb020; border-radius: 8px; padding: 12px; }
     .signatures { display: grid; grid-template-columns: repeat(2, 1fr); gap: 48px; margin-top: 56px; font-size: 13px; color: #475569; }
     .signatures div { border-top: 1px solid #94a3b8; padding-top: 6px; }
     .toolbar { max-width: 800px; margin: 0 auto 16px; display: flex; justify-content: flex-end; gap: 8px; }
     .toolbar button, .toolbar a { font: inherit; font-size: 14px; font-weight: 600; padding: 8px 14px; border-radius: 8px; border: 1px solid #cbd5e1; background: #fff; color: #0f172a; cursor: pointer; text-decoration: none; }
-    .toolbar button { background: #2563eb; border-color: #2563eb; color: #fff; }
-    footer { margin-top: 32px; font-size: 11px; color: #94a3b8; text-align: center; }
+    .toolbar button { background: #15171b; border-color: #15171b; color: #fff; }
+    footer { margin-top: 32px; font-size: 11px; color: #676c75; text-align: center; }
     @media print {
       body { background: #fff; padding: 0; }
       .page { box-shadow: none; border-radius: 0; padding: 0; max-width: none; }
@@ -47,7 +53,7 @@
 
   <div class="page">
     <header>
-      <div class="brand">StockSense<small><%= operation.warehouse ? operation.warehouse.name : '' %><%= operation.warehouse && operation.warehouse.address ? ' · ' + operation.warehouse.address : '' %></small></div>
+      <div class="brand"><%- include('../partials/logo', { cls: '' }) %><span>StockSense<small><%= operation.warehouse ? operation.warehouse.name : '' %><%= operation.warehouse && operation.warehouse.address ? ' · ' + operation.warehouse.address : '' %></small></span></div>
       <div class="doc">
         <h1><%= meta.label %></h1>
         <div class="ref"><%= operation.reference %></div>
@@ -99,7 +105,7 @@
 
     <footer>Generated by StockSense · <%= operation.reference %></footer>
   </div>
-  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+  <script src="/vendor/jsbarcode/JsBarcode.all.min.js"></script>
   <script>try { JsBarcode("#refBarcode", <%- jsonForScript(operation.reference) %>, { format: "CODE128", height: 34, fontSize: 10, margin: 0, displayValue: false }); } catch (e) {}</script>
 </body>
 </html>

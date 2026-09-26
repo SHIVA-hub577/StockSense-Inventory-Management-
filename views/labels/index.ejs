@@ -6,16 +6,21 @@
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <title><%= title %></title>
   <style>
+    @font-face { font-family: 'IBM Plex Sans'; font-weight: 400; src: url('/vendor/fonts/plex-sans/ibm-plex-sans-latin-400-normal.woff2') format('woff2'); }
+    @font-face { font-family: 'IBM Plex Sans'; font-weight: 600; src: url('/vendor/fonts/plex-sans/ibm-plex-sans-latin-600-normal.woff2') format('woff2'); }
+    @font-face { font-family: 'IBM Plex Sans'; font-weight: 700; src: url('/vendor/fonts/plex-sans/ibm-plex-sans-latin-700-normal.woff2') format('woff2'); }
+    @font-face { font-family: 'IBM Plex Mono'; font-weight: 500; src: url('/vendor/fonts/plex-mono/ibm-plex-mono-latin-500-normal.woff2') format('woff2'); }
+    @font-face { font-family: 'Bricolage Grotesque'; font-weight: 200 800; src: url('/vendor/fonts/bricolage/bricolage-grotesque-latin-wght-normal.woff2') format('woff2-variations'); }
     * { box-sizing: border-box; }
-    body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: #0f172a; background: #f1f5f9; margin: 0; padding: 24px; }
+    body { font-family: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; color: #15171b; background: #f6f5f1; margin: 0; padding: 24px; }
     .toolbar { max-width: 210mm; margin: 0 auto 16px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-    .toolbar p { margin: 0; color: #475569; font-size: 14px; }
-    .toolbar button { font: inherit; font-size: 14px; font-weight: 600; padding: 8px 14px; border-radius: 8px; border: 1px solid #2563eb; background: #2563eb; color: #fff; cursor: pointer; }
+    .toolbar p { margin: 0; color: #676c75; font-size: 14px; }
+    .toolbar button { font: inherit; font-size: 14px; font-weight: 600; padding: 8px 14px; border-radius: 8px; border: 1px solid #15171b; background: #15171b; color: #fff; cursor: pointer; }
     .sheet { max-width: 210mm; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(62mm, 1fr)); gap: 4mm; }
-    .label { background: #fff; border: 1px dashed #94a3b8; border-radius: 6px; padding: 4mm; display: flex; flex-direction: column; gap: 1.5mm; break-inside: avoid; page-break-inside: avoid; }
-    .kind { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b; }
-    .title { font-size: 14px; font-weight: 700; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .sub { font-size: 11px; color: #475569; }
+    .label { background: #fff; border: 1px dashed #d3cfc4; border-top: 4px solid #ffb020; border-radius: 6px; padding: 4mm; display: flex; flex-direction: column; gap: 1.5mm; break-inside: avoid; page-break-inside: avoid; }
+    .kind { font-size: 9px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #8f5c00; }
+    .title { font-family: 'Bricolage Grotesque', 'IBM Plex Sans', sans-serif; font-size: 15px; font-weight: 700; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sub { font-size: 11px; color: #3e434b; font-family: 'IBM Plex Mono', monospace; }
     svg.barcode { width: 100%; height: 16mm; }
     @media print {
       body { background: #fff; padding: 0; }
@@ -39,11 +44,11 @@
       </div>
     <% }) %>
   </div>
-  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+  <script src="/vendor/jsbarcode/JsBarcode.all.min.js"></script>
   <script>
     document.querySelectorAll('svg.barcode').forEach((svg) => {
       try {
-        JsBarcode(svg, svg.dataset.code, { format: 'CODE128', displayValue: true, fontSize: 12, margin: 0, height: 50 });
+        JsBarcode(svg, svg.dataset.code, { format: 'CODE128', displayValue: true, fontSize: 12, margin: 0, height: 50, font: 'IBM Plex Mono', lineColor: '#15171b' });
       } catch (e) {
         svg.outerHTML = '<p style="color:#b91c1c;font-size:11px">Cannot encode this code</p>';
       }

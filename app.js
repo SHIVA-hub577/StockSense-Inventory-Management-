@@ -36,6 +36,23 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Icon paths for scripts that draw icons in the browser (command palette)
+const iconScript = `window.StockSenseIcons = ${JSON.stringify(viewHelpers.iconPaths)};`;
+app.get('/js/icons.js', (req, res) => res.type('application/javascript').set('Cache-Control', 'public, max-age=3600').send(iconScript));
+
+// Front-end libraries and fonts served from node_modules, so the app works
+// offline (no CDNs). Only each package's distribution folder is exposed.
+const vendor = (dir) => express.static(path.join(__dirname, 'node_modules', dir), { index: false, maxAge: '1d' });
+app.use('/vendor/gsap', vendor('gsap/dist'));
+app.use('/vendor/three', vendor('three/build'));
+app.use('/vendor/lenis', vendor('lenis/dist'));
+app.use('/vendor/chart.js', vendor('chart.js/dist'));
+app.use('/vendor/jsbarcode', vendor('jsbarcode/dist'));
+app.use('/vendor/html5-qrcode', vendor('html5-qrcode'));
+app.use('/vendor/fonts/bricolage', vendor('@fontsource-variable/bricolage-grotesque/files'));
+app.use('/vendor/fonts/plex-sans', vendor('@fontsource/ibm-plex-sans/files'));
+app.use('/vendor/fonts/plex-mono', vendor('@fontsource/ibm-plex-mono/files'));
+
 // Mount Web UI Routes
 app.use('/', viewRoutes);
 app.use('/', inventoryRoutes);

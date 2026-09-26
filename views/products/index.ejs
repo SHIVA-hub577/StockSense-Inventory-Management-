@@ -4,86 +4,88 @@
   const query = { search: filters.search, category: filters.category, status: filters.status, archived: filters.archived };
   const statusTabs = [
     { key: '', label: 'All', count: counts.all },
-    { key: 'attention', label: 'Needs attention', count: counts.attention, tone: 'amber' },
+    { key: 'attention', label: 'Needs attention', count: counts.attention, accent: true },
     { key: 'low', label: 'Low stock', count: counts.low },
     { key: 'out', label: 'Out of stock', count: counts.out },
     // (low-stock products are in stock too - same meaning as the dashboard's 'Products in stock')
     { key: 'instock', label: 'In stock', count: counts.ok + counts.low },
   ];
   const hasFilters = filters.search || filters.category || filters.status;
+  // Stock meter: on hand against a scale of three reorder levels
+  const meter = (p) => {
+    const scale = Math.max(p.reorderLevel * 3, p.onHand, 1);
+    return { fill: Math.min(100, (Math.max(p.onHand, 0) / scale) * 100), mark: p.reorderLevel ? Math.min(100, (p.reorderLevel / scale) * 100) : null };
+  };
 %>
 
-<div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-  <div>
-    <h1 class="text-2xl font-bold text-white tracking-tight"><%= filters.archived ? 'Archived products' : 'Products' %></h1>
-    <p class="text-sm text-slate-400 mt-1">
+<header class="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+  <div data-reveal>
+    <p class="eyebrow">Inventory</p>
+    <h1 class="page-title mt-1"><%= filters.archived ? 'Archived products' : 'Products' %></h1>
+    <p class="text-sm text-muted mt-1.5">
       <% if (filters.archived) { %>
         Archived products are hidden from operations. Restore one to use it again.
       <% } else { %>
-        <%= counts.all %> active products · <span class="<%= counts.attention ? 'text-amber-400' : '' %>"><%= counts.attention %> need attention</span>
+        <%= counts.all %> active products · <span class="<%= counts.attention ? 'font-semibold text-warn' : '' %>"><%= counts.attention %> need attention</span>
       <% } %>
     </p>
   </div>
   <div class="flex flex-wrap gap-2">
+    <a href="/labels?products=all" target="_blank" rel="noopener" class="btn btn-secondary"><%- icon('label', 'w-4 h-4') %> Labels</a>
     <a href="/products<%= filters.archived ? '' : '?archived=1' %>" class="btn btn-secondary"><%- icon('archive', 'w-4 h-4') %> <%= filters.archived ? 'Active products' : 'Archived' %></a>
     <% if (isManager) { %>
-      <a href="/products/new" class="btn btn-primary"><%- icon('plus', 'w-4 h-4') %> New Product</a>
+      <a href="/products/new" class="btn btn-accent" data-magnetic><%- icon('plus', 'w-4 h-4') %> New Product</a>
     <% } %>
   </div>
-</div>
+</header>
 
-<!-- Stock status tabs -->
-<div class="flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Stock status">
-  <% statusTabs.forEach((tab) => { const active = (filters.status || '') === tab.key; %>
-    <a href="/products<%= buildQuery(query, { status: tab.key, page: null }) %>" role="tab" aria-selected="<%= active %>"
-       class="shrink-0 inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium border transition-colors <%= active ? 'bg-blue-600/15 border-blue-500/40 text-white' : 'border-slate-800 text-slate-400 hover:text-white hover:border-slate-700' %>">
-      <%= tab.label %>
-      <span class="text-xs rounded-md px-1.5 py-0.5 <%= tab.tone === 'amber' && tab.count ? 'bg-amber-500/15 text-amber-400' : 'bg-slate-800 text-slate-300' %>"><%= tab.count %></span>
-    </a>
-  <% }) %>
-</div>
-
-<!-- Filters -->
-<form method="GET" action="/products" class="card p-4 flex flex-col md:flex-row gap-3" role="search">
-  <% if (filters.status) { %><input type="hidden" name="status" value="<%= filters.status %>"><% } %>
-  <% if (filters.archived) { %><input type="hidden" name="archived" value="1"><% } %>
-  <div class="relative flex-1">
-    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"><%- icon('search', 'w-4 h-4') %></span>
-    <input type="search" name="search" value="<%= filters.search %>" placeholder="Search by name or SKU" class="input pl-9" aria-label="Search products">
-  </div>
-  <select name="category" class="input md:w-56" aria-label="Category">
-    <option value="">All categories</option>
-    <% categories.forEach((c) => { %>
-      <option value="<%= c._id %>" <%= String(c._id) === filters.category ? 'selected' : '' %>><%= c.name %></option>
+<!-- Stock status tabs + filters -->
+<div class="flex flex-col lg:flex-row lg:items-center gap-3">
+  <div class="segmented max-w-full overflow-x-auto scrollbar-none" role="tablist" aria-label="Stock status">
+    <% statusTabs.forEach((tab) => { const active = (filters.status || '') === tab.key; %>
+      <a href="/products<%= buildQuery(query, { status: tab.key, page: null }) %>" role="tab" aria-selected="<%= active %>">
+        <%= tab.label %>
+        <span class="count-chip <%= tab.accent && tab.count ? '!bg-accent !text-accent-ink' : '' %>"><%= tab.count %></span>
+      </a>
     <% }) %>
-  </select>
-  <div class="flex gap-2">
-    <button type="submit" class="btn btn-primary flex-1 md:flex-none">Apply</button>
-    <% if (hasFilters) { %>
-      <a href="/products<%= filters.archived ? '?archived=1' : '' %>" class="btn btn-secondary">Clear</a>
-    <% } %>
   </div>
-</form>
 
-<!-- Products table -->
-<div class="card overflow-hidden">
-  <% if (products.length === 0) { %>
-    <div class="p-12 text-center space-y-3">
-      <div class="inline-flex w-12 h-12 items-center justify-center rounded-2xl bg-slate-800 text-slate-400"><%- icon('products', 'w-6 h-6') %></div>
+  <form method="GET" action="/products" class="flex flex-1 flex-col sm:flex-row gap-2 lg:justify-end" role="search">
+    <% if (filters.status) { %><input type="hidden" name="status" value="<%= filters.status %>"><% } %>
+    <% if (filters.archived) { %><input type="hidden" name="archived" value="1"><% } %>
+    <div class="relative flex-1 lg:max-w-xs">
+      <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"><%- icon('search', 'w-4 h-4') %></span>
+      <input type="search" name="search" value="<%= filters.search %>" placeholder="Name or SKU" class="input input-sm pl-9" aria-label="Search products">
+    </div>
+    <select name="category" class="input input-sm sm:w-48" aria-label="Category">
+      <option value="">All categories</option>
+      <% categories.forEach((c) => { %>
+        <option value="<%= c._id %>" <%= String(c._id) === filters.category ? 'selected' : '' %>><%= c.name %></option>
+      <% }) %>
+    </select>
+    <div class="flex gap-2">
+      <button type="submit" class="btn btn-primary btn-sm flex-1 sm:flex-none h-9">Apply</button>
       <% if (hasFilters) { %>
-        <p class="text-white font-semibold">No products match these filters</p>
-        <a href="/products" class="text-sm text-blue-400 hover:text-blue-300">Clear filters</a>
-      <% } else if (filters.archived) { %>
-        <p class="text-white font-semibold">No archived products</p>
-      <% } else { %>
-        <p class="text-white font-semibold">No products yet</p>
-        <% if (isManager) { %><a href="/products/new" class="btn btn-primary">Create your first product</a><% } %>
+        <a href="/products<%= filters.archived ? '?archived=1' : '' %>" class="btn btn-ghost btn-sm h-9">Clear</a>
       <% } %>
     </div>
+  </form>
+</div>
+
+<!-- Products table -->
+<div class="card overflow-hidden" data-reveal>
+  <% if (products.length === 0) { %>
+    <% if (hasFilters) { %>
+      <%- include('../partials/empty', { art: 'search', title: 'No products match these filters', text: 'Try another name, SKU or category.', action: '<a href="/products" class="btn btn-secondary btn-sm">Clear filters</a>' }) %>
+    <% } else if (filters.archived) { %>
+      <%- include('../partials/empty', { art: 'crate', title: 'No archived products', text: 'Products you archive show up here.' }) %>
+    <% } else { %>
+      <%- include('../partials/empty', { art: 'crate', title: 'No products yet', text: 'Add the first item you keep on the shelves.', action: isManager ? '<a href="/products/new" class="btn btn-accent">Create your first product</a>' : '' }) %>
+    <% } %>
   <% } else { %>
     <div class="overflow-x-auto">
-      <table class="min-w-full">
-        <thead class="bg-slate-900/80">
+      <table class="table table-hover">
+        <thead>
           <tr>
             <th class="th">Product</th>
             <th class="th">Category</th>
@@ -95,34 +97,40 @@
           </tr>
         </thead>
         <tbody>
-          <% products.forEach((p) => { const st = STOCK_STATUS_META[p.stockStatus]; %>
-            <tr class="border-t border-slate-800 hover:bg-slate-800/30">
+          <% products.forEach((p) => { const st = STOCK_STATUS_META[p.stockStatus]; const m = meter(p); %>
+            <tr>
               <td class="td">
-                <a href="/products/<%= p._id %>" class="font-semibold text-white hover:text-blue-300"><%= p.name %></a>
-                <div class="text-xs font-mono text-slate-500"><%= p.sku %></div>
+                <a href="/products/<%= p._id %>" class="font-semibold hover:text-accent-text"><%= p.name %></a>
+                <div class="mt-1"><span class="sku"><%= p.sku %></span></div>
               </td>
-              <td class="td text-slate-400"><%= p.category ? p.category.name : '—' %></td>
-              <td class="td text-right font-semibold tabular-nums"><%= fmtQty(p.onHand) %> <span class="text-xs font-normal text-slate-500"><%= p.uom %></span></td>
-              <% const forecastTone = p.forecast < 0 ? 'text-red-400 font-semibold' : p.forecast <= p.reorderLevel ? 'text-amber-400' : ''; %>
-              <td class="td text-right tabular-nums <%= forecastTone %>" <%- p.forecast < 0 ? 'title="Confirmed deliveries exceed the stock on hand"' : '' %>>
+              <td class="td text-muted"><%= p.category ? p.category.name : '—' %></td>
+              <td class="td text-right">
+                <span class="font-mono font-semibold tabular"><%= fmtQty(p.onHand) %></span> <span class="text-xs text-muted"><%= p.uom %></span>
+                <span class="relative mt-1.5 ml-auto block h-1.5 w-24 rounded-full bg-sunken overflow-visible" title="On hand vs reorder level" aria-hidden="true">
+                  <span class="absolute inset-y-0 left-0 rounded-full <%= p.stockStatus === 'out' ? 'bg-bad' : p.stockStatus === 'low' ? 'bg-warn' : 'bg-ok' %>" style="width: <%= m.fill.toFixed(1) %>%"></span>
+                  <% if (m.mark !== null) { %><span class="absolute -top-0.5 -bottom-0.5 w-0.5 rounded bg-ink/60" style="left: <%= m.mark.toFixed(1) %>%"></span><% } %>
+                </span>
+              </td>
+              <% const forecastTone = p.forecast < 0 ? 'text-bad font-semibold' : p.forecast <= p.reorderLevel ? 'text-warn' : ''; %>
+              <td class="td text-right font-mono tabular <%= forecastTone %>" <%- p.forecast < 0 ? 'title="Confirmed deliveries exceed the stock on hand"' : '' %>>
                 <%= fmtQty(p.forecast) %><%= p.forecast < 0 ? ' ⚠' : '' %>
                 <% if (p.incoming || p.outgoing) { %>
-                  <div class="text-xs text-slate-500">
-                    <% if (p.incoming) { %><span class="text-emerald-400">+<%= fmtQty(p.incoming) %></span><% } %>
-                    <% if (p.outgoing) { %><span class="text-red-400">−<%= fmtQty(p.outgoing) %></span><% } %>
+                  <div class="text-xs">
+                    <% if (p.incoming) { %><span class="text-ok">+<%= fmtQty(p.incoming) %></span><% } %>
+                    <% if (p.outgoing) { %><span class="text-bad">−<%= fmtQty(p.outgoing) %></span><% } %>
                   </div>
                 <% } %>
               </td>
-              <td class="td text-right tabular-nums text-slate-400"><%= fmtQty(p.reorderLevel) %></td>
+              <td class="td text-right font-mono tabular text-muted"><%= fmtQty(p.reorderLevel) %></td>
               <td class="td">
                 <span class="badge <%= st.classes %>"><%= st.label %></span>
                 <% if (p.outlook && p.outlook.stockoutDate && p.outlook.status !== 'out') { %>
-                  <div class="text-[11px] mt-1 <%= p.outlook.status === 'critical' ? 'text-red-400' : 'text-amber-400' %>" title="Projected from usage and confirmed operations">runs out <%= fmtRelativeDays(p.outlook.stockoutDate) %></div>
+                  <div class="text-[11px] mt-1 font-medium <%= p.outlook.status === 'critical' ? 'text-bad' : 'text-warn' %>" title="Projected from usage and confirmed operations">runs out <%= fmtRelativeDays(p.outlook.stockoutDate) %></div>
                 <% } %>
               </td>
               <td class="td text-right whitespace-nowrap">
                 <% if (!filters.archived && p.stockStatus !== 'ok') { %>
-                  <a href="/receipts/new?product=<%= p._id %>&qty=<%= reorderSuggestion(p) %>" class="btn btn-secondary btn-sm" title="Create a receipt to replenish">Reorder</a>
+                  <a href="/receipts/new?product=<%= p._id %>&qty=<%= reorderSuggestion(p) %>" class="btn btn-accent btn-sm" title="Create a receipt to replenish"><%- icon('replenish', 'w-3.5 h-3.5') %> Reorder</a>
                 <% } %>
                 <a href="/products/<%= p._id %>" class="btn btn-secondary btn-sm">View</a>
               </td>

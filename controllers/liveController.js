@@ -10,6 +10,7 @@ const liveHub = require('../services/liveHub');
 const alertService = require('../services/alertService');
 const productService = require('../services/productService');
 const scanService = require('../services/scanService');
+const searchService = require('../services/searchService');
 const AppError = require('../utils/AppError');
 
 /* ------------------------------- Live -------------------------------- */
@@ -28,7 +29,7 @@ const navCounts = async (req, res) => {
   byType.forEach((r) => {
     counts[r._id] = r.n;
   });
-  res.json({ success: true, data: { counts, online: liveHub.onlineUsers().map((u) => ({ id: u.id, name: u.name })) } });
+  res.json({ success: true, data: { counts, online: liveHub.onlineUsers().map((u) => ({ id: u.id, name: u.name, role: u.role })) } });
 };
 
 /* ------------------------------ Alerts ------------------------------- */
@@ -40,6 +41,18 @@ const alerts = async (req, res) => {
 const alertsReadAll = async (req, res) => {
   await alertService.markAllRead(req.user._id);
   res.json({ success: true, message: 'All alerts marked as read' });
+};
+
+/* ------------------------------ Search ------------------------------- */
+
+// GET /api/search?q=...  (command palette)
+const searchAll = async (req, res) => {
+  res.json({ success: true, data: await searchService.search(req.query.q) });
+};
+
+// Living style guide of the design system
+const styleguidePage = (req, res) => {
+  res.render('styleguide', { title: 'Style guide - StockSense', activeNav: 'styleguide' });
 };
 
 /* ------------------------------- Scan -------------------------------- */
@@ -91,4 +104,6 @@ module.exports = {
   scanPage,
   resolve,
   labelsPage,
+  searchAll,
+  styleguidePage,
 };

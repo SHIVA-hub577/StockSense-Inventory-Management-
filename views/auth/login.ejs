@@ -1,112 +1,64 @@
-<%- include('../layout/header') %>
+<%- include('../layout/auth-top') %>
 
-<main class="flex-grow flex items-center justify-center p-4">
-  <div class="w-full max-w-md glass-card rounded-2xl shadow-2xl p-8 space-y-6 border border-slate-800">
-    <div class="text-center space-y-2">
-      <div class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-600/20 text-blue-400 mb-2 ring-1 ring-blue-500/30">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-        </svg>
-      </div>
-      <h1 class="text-2xl font-bold tracking-tight text-white">Welcome back</h1>
-      <p class="text-sm text-slate-400">Sign in to your StockSense account</p>
-    </div>
+<div class="space-y-2">
+  <p class="eyebrow">Welcome back</p>
+  <h1 class="font-display text-[2.2rem] font-bold leading-[1.05] tracking-[-0.035em]">Sign in to your warehouse</h1>
+  <p class="text-sm text-muted">Pick up where the team left off - everything is live.</p>
+</div>
 
-    <!-- Alert Box -->
-    <div id="alertBox" class="<%= error || success ? '' : 'hidden' %> p-4 rounded-xl text-sm font-medium transition-all duration-200 <%= error ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' %>">
-      <%= error || success %>
-    </div>
+<div id="alertBox" class="<%= error || success ? '' : 'hidden' %> flex items-start gap-2.5 rounded-xl border p-3.5 text-sm font-medium <%= error ? 'border-bad/30 bg-bad-soft text-bad' : 'border-ok/30 bg-ok-soft text-ok' %>" role="<%= error ? 'alert' : 'status' %>"><%= error || success %></div>
 
-    <form id="loginForm" class="space-y-4">
-      <div>
-        <label for="email" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1">Email Address</label>
-        <input 
-          type="email" 
-          id="email" 
-          name="email" 
-          required 
-          placeholder="name@company.com"
-          class="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition-all"
-        />
-      </div>
-
-      <div>
-        <div class="flex justify-between items-center mb-1">
-          <label for="password" class="text-xs font-semibold uppercase tracking-wider text-slate-300">Password</label>
-          <a href="/auth/forgot-password" class="text-xs text-blue-400 hover:text-blue-300 transition-colors">Forgot Password?</a>
-        </div>
-        <input 
-          type="password" 
-          id="password" 
-          name="password" 
-          required 
-          placeholder="••••••••"
-          class="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition-all"
-        />
-      </div>
-
-      <button 
-        type="submit" 
-        id="submitBtn"
-        class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold text-sm hover:from-blue-500 hover:to-indigo-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-950 transition-all shadow-lg shadow-blue-600/25"
-      >
-        Sign In
-      </button>
-    </form>
-
-    <div class="text-center pt-2 border-t border-slate-800/60">
-      <p class="text-xs text-slate-400">
-        Don't have an account? 
-        <a href="/auth/signup" class="font-medium text-blue-400 hover:text-blue-300 transition-colors">Create Account</a>
-      </p>
-    </div>
+<form id="loginForm" class="space-y-5" novalidate>
+  <div>
+    <label for="email" class="label">Email address</label>
+    <input type="email" id="email" name="email" required autocomplete="email" placeholder="name@company.com" class="input h-12">
   </div>
-</main>
+
+  <%- include('../partials/password-field', { id: 'password', name: 'password', label: 'Password', autocomplete: 'current-password', extra: '<a href="/auth/forgot-password" class="text-xs font-semibold text-accent-text hover:underline underline-offset-4">Forgot password?</a>' }) %>
+
+  <button type="submit" id="submitBtn" class="btn btn-primary btn-lg w-full" data-magnetic>Sign in <%- icon('arrowRight', 'w-4 h-4') %></button>
+</form>
+
+<p class="text-sm text-muted text-center">
+  New to StockSense? <a href="/auth/signup" class="link-inline">Create an account</a>
+</p>
 
 <script>
-  document.getElementById('loginForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
+  (() => {
+    const { authAlert, setBusy } = window.StockSense;
+    const form = document.getElementById('loginForm');
     const alertBox = document.getElementById('alertBox');
     const submitBtn = document.getElementById('submitBtn');
-    
-    alertBox.classList.add('hidden');
-    submitBtn.disabled = true;
-    submitBtn.innerText = 'Signing in...';
 
-    const email = document.getElementById('email').value.trim();
-    const password = document.getElementById('password').value;
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      if (!email || !password) return authAlert(alertBox, 'Enter your email and password.', 'error');
 
-    try {
-      const res = await fetch('/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok && data.success) {
-        alertBox.className = 'p-4 rounded-xl text-sm font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
-        alertBox.innerText = 'Login successful! Redirecting to dashboard...';
-        alertBox.classList.remove('hidden');
-        setTimeout(() => {
-          window.location.href = '/dashboard';
-        }, 800);
-      } else {
-        alertBox.className = 'p-4 rounded-xl text-sm font-medium bg-red-500/10 text-red-400 border border-red-500/20';
-        alertBox.innerText = data.message || 'Login failed. Please check your credentials.';
-        alertBox.classList.remove('hidden');
-        submitBtn.disabled = false;
-        submitBtn.innerText = 'Sign In';
+      setBusy(submitBtn, true, 'Signing in...');
+      try {
+        const res = await fetch('/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          authAlert(alertBox, 'Signed in. Opening your dashboard...', 'success');
+          submitBtn.classList.replace('btn-primary', 'btn-success');
+          submitBtn.innerHTML = '✓ Welcome back';
+          setTimeout(() => { window.location.href = '/dashboard'; }, 500);
+        } else {
+          authAlert(alertBox, data.message || 'Login failed. Please check your credentials.', 'error');
+          setBusy(submitBtn, false);
+        }
+      } catch (err) {
+        authAlert(alertBox, 'Network error. Please try again.', 'error');
+        setBusy(submitBtn, false);
       }
-    } catch (err) {
-      alertBox.className = 'p-4 rounded-xl text-sm font-medium bg-red-500/10 text-red-400 border border-red-500/20';
-      alertBox.innerText = 'Network error. Please try again.';
-      alertBox.classList.remove('hidden');
-      submitBtn.disabled = false;
-      submitBtn.innerText = 'Sign In';
-    }
-  });
+    });
+  })();
 </script>
 
-<%- include('../layout/footer') %>
+<%- include('../layout/auth-bottom') %>
