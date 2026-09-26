@@ -15,7 +15,9 @@ const mongoose = require('mongoose');
  * difference (in whichever direction is needed).
  *
  * Status flow:  draft -> (waiting | ready) -> done
+ *               waiting | ready -> draft (reset, to edit again)
  *               any status except done -> canceled
+ * Deliveries can additionally be marked picked -> packed while ready.
  */
 const OPERATION_TYPES = ['receipt', 'delivery', 'internal', 'adjustment'];
 const OPERATION_STATUSES = ['draft', 'waiting', 'ready', 'done', 'canceled'];
@@ -122,6 +124,25 @@ const operationSchema = new mongoose.Schema(
     },
     validatedAt: {
       type: Date,
+      default: null,
+    },
+    // Deliveries only: pick -> pack progress before validation
+    pickedAt: {
+      type: Date,
+      default: null,
+    },
+    pickedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    packedAt: {
+      type: Date,
+      default: null,
+    },
+    packedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
       default: null,
     },
     canceledAt: {

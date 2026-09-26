@@ -1,0 +1,239 @@
+<%- include('../layout/app-top') %>
+<%
+  const op = operation;
+  const isOpen = ['draft', 'waiting', 'ready'].includes(op.status);
+  const isDelivery = op.type === 'delivery';
+  const isOutgoing = ['delivery', 'internal'].includes(op.type);
+  const isAdjustment = op.type === 'adjustment';
+  const late = isLate(op);
+  const canValidate = isOpen && (isAdjustment ? user.role === 'manager' : !isDelivery || (op.status === 'ready' && op.packedAt));
+
+  // Progress stepper
+  const flow = isDelivery ? ['draft', 'ready', 'picked', 'packed', 'done'] : ['draft', 'ready', 'done'];
+  let currentStep = op.status;
+  if (op.status === 'waiting') currentStep = 'ready';
+  if (isDelivery && op.status === 'ready') currentStep = op.packedAt ? 'packed' : op.pickedAt ? 'picked' : 'ready';
+  const currentIndex = flow.indexOf(currentStep);
+  const stepLabel = (step) => ({ draft: 'Draft', ready: op.status === 'waiting' ? 'Waiting' : 'Ready', picked: 'Picked', packed: 'Packed', done: 'Done' }[step]);
+
+  // Which action is the obvious next step
+  let primary = null;
+  if (op.status === 'draft') primary = 'confirm';
+  else if (op.status === 'waiting') primary = 'confirm';
+  else if (op.status === 'ready') primary = isDelivery && !op.pickedAt ? 'pick' : isDelivery && !op.packedAt ? 'pack' : 'validate';
+  const btn = (action) => 'btn ' + (primary === action ? 'btn-primary' : 'btn-secondary');
+  const fromLabel = op.type === 'receipt' ? (op.partner || op.sourceLocation.fullName) : op.sourceLocation.fullName;
+  const toLabel = op.type === 'delivery' ? (op.partner || op.destLocation.fullName) : op.destLocation.fullName;
+%>
+
+<nav class="text-sm text-slate-500" aria-label="Breadcrumb">
+  <% if (isAdjustment) { %><span><%= meta.plural %></span><% } else { %><a href="/<%= meta.slug %>" class="hover:text-slate-300"><%= meta.plural %></a><% } %>
+  <span class="mx-1">/</span> <span class="text-slate-300 font-mono"><%= op.reference %></span>
+</nav>
+
+<div class="flex flex-col xl:flex-row xl:items-start justify-between gap-4">
+  <div class="space-y-2">
+    <div class="flex flex-wrap items-center gap-3">
+      <h1 class="text-2xl font-bold text-white tracking-tight font-mono"><%= op.reference %></h1>
+      <span class="badge <%= STATUS_META[op.status].classes %>"><%= STATUS_META[op.status].label %></span>
+      <% if (late) { %><span class="badge bg-red-500/10 text-red-400 border-red-500/30">Late</span><% } %>
+    </div>
+    <p class="text-sm text-slate-400"><%= meta.label %> · <%= fromLabel %> → <%= toLabel %></p>
+  </div>
+
+  <div class="flex flex-wrap gap-2" id="operationActions">
+    <% if (op.status === 'draft') { %>
+      <% if (!isAdjustment) { %><a href="/operations/<%= op._id %>/edit" class="btn btn-secondary"><%- icon('pencil', 'w-4 h-4') %> Edit</a><% } %>
+      <button type="button" class="<%= btn('confirm') %>" data-op-action="confirm">Mark as To Do</button>
+    <% } %>
+    <% if (op.status === 'waiting') { %>
+      <button type="button" class="<%= btn('confirm') %>" data-op-action="confirm">Check availability</button>
+    <% } %>
+    <% if (isDelivery && op.status === 'ready' && !op.pickedAt) { %>
+      <button type="button" class="<%= btn('pick') %>" data-op-action="pick">Mark as picked</button>
+    <% } %>
+    <% if (isDelivery && op.status === 'ready' && op.pickedAt && !op.packedAt) { %>
+      <button type="button" class="<%= btn('pack') %>" data-op-action="pack">Mark as packed</button>
+    <% } %>
+    <% if (canValidate) { %>
+      <button type="button" class="<%= primary === 'validate' ? 'btn btn-success' : 'btn btn-secondary' %>" data-op-action="validate"><%- icon('check', 'w-4 h-4') %> Validate</button>
+    <% } %>
+    <% if (['waiting', 'ready'].includes(op.status)) { %>
+      <button type="button" class="btn btn-secondary" data-op-action="reset" title="Back to draft to edit it">Back to draft</button>
+    <% } %>
+    <% if (isOpen) { %>
+      <button type="button" class="btn btn-danger" data-op-action="cancel">Cancel</button>
+    <% } %>
+    <% if (!isAdjustment) { %>
+      <button type="button" class="btn btn-secondary" data-op-action="duplicate" title="Create a new draft with the same products"><%- icon('copy', 'w-4 h-4') %> Duplicate</button>
+    <% } %>
+    <a href="/operations/<%= op._id %>/print" target="_blank" rel="noopener" class="btn btn-secondary"><%- icon('printer', 'w-4 h-4') %> Print</a>
+  </div>
+</div>
+
+<!-- Progress -->
+<% if (op.status === 'canceled') { %>
+  <div class="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
+    Canceled on <%= fmtDateTime(op.canceledAt) %>. No stock was changed.<% if (!isAdjustment) { %> Use <strong>Duplicate</strong> to start again.<% } %>
+  </div>
+<% } else { %>
+  <ol class="card p-4 flex items-center gap-2 overflow-x-auto" aria-label="Progress">
+    <% flow.forEach((step, i) => {
+         const state = i < currentIndex || op.status === 'done' ? 'complete' : i === currentIndex ? 'current' : 'upcoming';
+         const waiting = step === 'ready' && op.status === 'waiting'; %>
+      <li class="flex items-center gap-2 shrink-0" <%= state === 'current' ? 'aria-current=step' : '' %>>
+        <span class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold
+          <%= state === 'complete' ? 'bg-emerald-500/20 text-emerald-400' : state === 'current' ? (waiting ? 'bg-amber-500/20 text-amber-400 ring-2 ring-amber-500/40' : 'bg-blue-500/20 text-blue-300 ring-2 ring-blue-500/40') : 'bg-slate-800 text-slate-500' %>">
+          <%- state === 'complete' ? icon('check', 'w-4 h-4') : i + 1 %>
+        </span>
+        <span class="text-sm <%= state === 'upcoming' ? 'text-slate-500' : 'text-white font-medium' %>"><%= stepLabel(step) %></span>
+        <% if (i < flow.length - 1) { %><span class="w-8 sm:w-12 h-px <%= i < currentIndex ? 'bg-emerald-500/50' : 'bg-slate-700' %>"></span><% } %>
+      </li>
+    <% }) %>
+  </ol>
+<% } %>
+
+<!-- Shortages -->
+<% if (isOpen && isOutgoing && shortages.length > 0) { %>
+  <div class="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 space-y-3" role="status">
+    <div class="flex items-start gap-3 text-sm text-amber-200">
+      <%- icon('warning', 'w-5 h-5 shrink-0 text-amber-400') %>
+      <p>Not enough stock in <strong><%= op.sourceLocation.fullName %></strong> to process this <%= meta.label.toLowerCase() %>. It can be validated once stock arrives.</p>
+    </div>
+    <ul class="space-y-2 pl-8">
+      <% shortages.forEach((s) => { const missing = Math.round((s.required - s.available) * 1000) / 1000; %>
+        <li class="flex flex-wrap items-center gap-3 text-sm text-amber-100">
+          <span><strong><%= s.name %></strong> (<span class="font-mono"><%= s.sku %></span>): need <%= fmtQty(s.required) %>, have <%= fmtQty(s.available) %> - short <%= fmtQty(missing) %></span>
+          <a href="/receipts/new?product=<%= s.product %>&qty=<%= missing %>" class="btn btn-secondary btn-sm">Create receipt</a>
+        </li>
+      <% }) %>
+    </ul>
+  </div>
+<% } %>
+
+<div class="grid lg:grid-cols-3 gap-6">
+  <!-- Details -->
+  <section class="card p-5 space-y-4 lg:col-span-1">
+    <h2 class="text-sm font-semibold text-white">Details</h2>
+    <dl class="space-y-3 text-sm">
+      <% if (op.type !== 'internal' || op.partner) { %>
+        <div><dt class="text-slate-500"><%= meta.partnerLabel %></dt><dd class="text-slate-200 font-medium"><%= op.partner || '—' %></dd></div>
+      <% } %>
+      <div><dt class="text-slate-500">From</dt><dd class="text-slate-200"><%= op.sourceLocation.fullName %></dd></div>
+      <div><dt class="text-slate-500">To</dt><dd class="text-slate-200"><%= op.destLocation.fullName %></dd></div>
+      <div><dt class="text-slate-500">Warehouse</dt><dd class="text-slate-200"><%= op.warehouse ? op.warehouse.name : '—' %></dd></div>
+      <div><dt class="text-slate-500">Scheduled</dt><dd class="<%= late ? 'text-red-400' : 'text-slate-200' %>"><%= fmtDate(op.scheduledDate) %></dd></div>
+      <div><dt class="text-slate-500">Created</dt><dd class="text-slate-200"><%= fmtDateTime(op.createdAt) %><%= op.createdBy ? ' by ' + op.createdBy.name : '' %></dd></div>
+      <% if (op.pickedAt) { %><div><dt class="text-slate-500">Picked</dt><dd class="text-slate-200"><%= fmtDateTime(op.pickedAt) %><%= op.pickedBy ? ' by ' + op.pickedBy.name : '' %></dd></div><% } %>
+      <% if (op.packedAt) { %><div><dt class="text-slate-500">Packed</dt><dd class="text-slate-200"><%= fmtDateTime(op.packedAt) %><%= op.packedBy ? ' by ' + op.packedBy.name : '' %></dd></div><% } %>
+      <% if (op.validatedAt) { %><div><dt class="text-slate-500">Validated</dt><dd class="text-emerald-400"><%= fmtDateTime(op.validatedAt) %><%= op.validatedBy ? ' by ' + op.validatedBy.name : '' %></dd></div><% } %>
+      <% if (op.notes) { %><div><dt class="text-slate-500">Notes</dt><dd class="text-slate-200 whitespace-pre-line"><%= op.notes %></dd></div><% } %>
+    </dl>
+  </section>
+
+  <!-- Lines -->
+  <section class="card overflow-hidden lg:col-span-2">
+    <h2 class="px-4 py-3 border-b border-slate-800 text-sm font-semibold text-white">Products</h2>
+    <div class="overflow-x-auto">
+      <table class="min-w-full">
+        <thead class="bg-slate-900/80">
+          <tr>
+            <th class="th">Product</th>
+            <th class="th text-right"><%= isAdjustment ? 'Counted' : 'Quantity' %></th>
+            <% if (isAdjustment && op.status === 'done') { %><th class="th text-right">Recorded before</th><% } %>
+            <% if (isOpen && isOutgoing) { %><th class="th text-right">Available at source</th><% } %>
+          </tr>
+        </thead>
+        <tbody>
+          <% op.lines.forEach((line) => { const p = line.product; const short = isOpen && isOutgoing && line.available < line.quantity; %>
+            <tr class="border-t border-slate-800">
+              <td class="td">
+                <a href="/products/<%= p._id %>" class="font-medium text-white hover:text-blue-300"><%= p.name %></a>
+                <div class="text-xs font-mono text-slate-500"><%= p.sku %></div>
+              </td>
+              <td class="td text-right tabular-nums font-semibold"><%= fmtQty(line.quantity) %> <span class="text-xs font-normal text-slate-500"><%= p.uom %></span></td>
+              <% if (isAdjustment && op.status === 'done') { %>
+                <td class="td text-right tabular-nums text-slate-400"><%= line.theoreticalQty === null || line.theoreticalQty === undefined ? '—' : fmtQty(line.theoreticalQty) %></td>
+              <% } %>
+              <% if (isOpen && isOutgoing) { %>
+                <td class="td text-right tabular-nums <%= short ? 'text-red-400 font-semibold' : 'text-emerald-400' %>"><%= fmtQty(line.available) %> <%= p.uom %><%= short ? ' ⚠' : '' %></td>
+              <% } %>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<% if (moves.length > 0) { %>
+  <section class="card overflow-hidden">
+    <h2 class="px-4 py-3 border-b border-slate-800 text-sm font-semibold text-white">Stock moves (ledger)</h2>
+    <div class="overflow-x-auto">
+      <table class="min-w-full">
+        <thead class="bg-slate-900/80"><tr><th class="th">Product</th><th class="th">From</th><th class="th">To</th><th class="th text-right">Quantity</th><th class="th">Date</th></tr></thead>
+        <tbody>
+          <% moves.forEach((m) => { %>
+            <tr class="border-t border-slate-800">
+              <td class="td"><%= m.product ? m.product.name : '—' %></td>
+              <td class="td text-slate-300"><%= m.fromLocation.fullName %></td>
+              <td class="td text-slate-300"><%= m.toLocation.fullName %></td>
+              <td class="td text-right tabular-nums font-semibold"><%= fmtQty(m.quantity) %> <span class="text-xs font-normal text-slate-500"><%= m.product ? m.product.uom : '' %></span></td>
+              <td class="td text-slate-400 whitespace-nowrap"><%= fmtDateTime(m.date) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+<% } %>
+
+<script>
+  (() => {
+    const { api, toast, toastAfterNavigation, confirmDialog, setBusy } = window.StockSense;
+    const id = '<%= op._id %>';
+    const reference = '<%= op.reference %>';
+
+    const confirmations = {
+      validate: {
+        title: `Validate ${reference}?`,
+        message: '<%= op.type === "receipt" ? "Stock will be added to the destination location." : op.type === "delivery" ? "Stock will be removed from the source location." : isAdjustment ? "Recorded stock will be set to the counted quantities." : "Stock will move between the two locations." %> This cannot be undone.',
+        confirmLabel: 'Validate',
+      },
+      cancel: {
+        title: `Cancel ${reference}?`,
+        message: 'The operation will be closed without changing any stock. You can duplicate it later.',
+        confirmLabel: 'Cancel operation',
+        danger: true,
+      },
+    };
+
+    document.getElementById('operationActions').addEventListener('click', async (e) => {
+      const button = e.target.closest('[data-op-action]');
+      if (!button) return;
+      const action = button.dataset.opAction;
+
+      if (confirmations[action] && !(await confirmDialog(confirmations[action]))) return;
+
+      setBusy(button, true);
+      try {
+        const res = await api('POST', `/api/operations/${id}/${action}`);
+        const target = action === 'duplicate' ? `/operations/${res.data.operation._id}` : window.location.pathname;
+        const tone = action === 'confirm' && res.data.operation.status === 'waiting' ? 'info' : 'success';
+        toastAfterNavigation(res.message, tone);
+        window.location.href = target;
+      } catch (err) {
+        // A refused validation parks the operation as "waiting": reload to show the shortages
+        if (action === 'validate' && err.details && err.details.shortages) {
+          toastAfterNavigation(err.message, 'error');
+          window.location.reload();
+          return;
+        }
+        toast(err.message, 'error', 8000);
+        setBusy(button, false);
+      }
+    });
+  })();
+</script>
+
+<%- include('../layout/app-bottom') %>

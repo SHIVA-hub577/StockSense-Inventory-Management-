@@ -30,6 +30,31 @@ const errorHandler = (err, req, res, next) => {
     message = `A record with this ${fields || 'value'} already exists`;
   }
 
+  if (statusCode >= 500) {
+    console.error(`[Error] ${req.method} ${req.originalUrl}:`, err);
+    if (process.env.NODE_ENV === 'production') {
+      message = 'Something went wrong. Please try again.';
+    }
+  }
+
+  // Browser page navigation (not API / fetch calls): show the HTML error page
+  const isPageRequest =
+    req.method === 'GET' &&
+    !req.originalUrl.startsWith('/api/') &&
+    !req.originalUrl.startsWith('/health') &&
+    req.accepts('html') &&
+    !req.xhr &&
+    !req.headers['x-requested-with'];
+
+  if (isPageRequest) {
+    const titles = { 400: 'Bad Request', 403: 'Access Denied', 404: 'Page Not Found' };
+    return res.status(statusCode).render('error', {
+      title: titles[statusCode] || 'Something Went Wrong',
+      message: statusCode === 404 && !err.statusCode ? 'The page you are looking for does not exist.' : message,
+      user: req.user || null,
+    });
+  }
+
   res.status(statusCode).json({
     success: false,
     message,

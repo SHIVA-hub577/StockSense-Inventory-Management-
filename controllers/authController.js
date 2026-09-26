@@ -247,9 +247,11 @@ const login = async (req, res, next) => {
  * @access  Public
  */
 const logout = async (req, res) => {
-  res.cookie('token', 'none', {
-    expires: new Date(Date.now() + 10 * 1000),
+  // Delete the session cookie (same options it was set with in utils/generateToken.js)
+  res.clearCookie('token', {
     httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
   });
 
   if (req.accepts('html') && !req.xhr && !req.headers['x-requested-with']) {

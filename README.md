@@ -71,6 +71,11 @@ Once the terminal displays `[Server] Running in development mode on port 5000` a
 - 🔑 **Login Page**: [http://localhost:5000/auth/login](http://localhost:5000/auth/login)
 - 🔒 **Forgot Password Page**: [http://localhost:5000/auth/forgot-password](http://localhost:5000/auth/forgot-password)
 - 📊 **Dashboard**: [http://localhost:5000/dashboard](http://localhost:5000/dashboard)
+- 📦 **Products / Categories**: [/products](http://localhost:5000/products) · [/categories](http://localhost:5000/categories)
+- 🚚 **Operations**: [/receipts](http://localhost:5000/receipts) · [/deliveries](http://localhost:5000/deliveries) · [/transfers](http://localhost:5000/transfers)
+- 👤 **My Profile**: [/profile](http://localhost:5000/profile)
+
+After `npm run seed`, log in with the demo accounts listed in `scripts/seed.js`.
 
 ---
 
@@ -86,5 +91,27 @@ Once the terminal displays `[Server] Running in development mode on port 5000` a
 | `ALL` | `/auth/logout` | Public | - | Clears JWT session cookie |
 | `POST` | `/auth/forgot-password` | Public | `email` | Generates 6-digit OTP & emails via Nodemailer |
 | `POST` | `/auth/verify-otp` | Public | `email`, `otp` | Validates 6-digit OTP code for password reset |
-| `POST` | `/auth/reset-password` | Public | `email`, `newPassword` | Resets password after OTP verification |
+| `POST` | `/auth/reset-password` | Public | `email`, `otp`, `newPassword` | Resets password (the OTP is checked again) |
 | `GET` | `/auth/me` | Protected | `Bearer <token>` or Cookie | Gets currently logged in user profile |
+
+### 📦 Inventory API (`/api`, login required)
+All endpoints return JSON `{ success, message, data }`. Mutations marked **Manager** need the `manager` role.
+
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| `GET` | `/api/products` | Any | List with `search`, `category`, `status` (`ok`/`low`/`out`/`attention`), `archived=1`, `page` |
+| `GET` | `/api/products/:id` | Any | Product with on hand, incoming, outgoing, forecast, stock per location, moves |
+| `POST` | `/api/products` | Manager | Create (`name`, `sku`, `category`, `uom`, `reorderLevel`, `reorderQty`, optional `initialQty` + `initialLocation`) |
+| `PATCH` | `/api/products/:id` | Manager | Update (unit of measure is locked once stock has moved) |
+| `POST` | `/api/products/:id/archive` | `/restore` | Manager | Archive (needs zero stock and no open operations) / restore |
+| `GET` / `POST` | `/api/categories` | Any / Manager | List with product counts / create |
+| `PATCH` / `DELETE` | `/api/categories/:id` | Manager | Rename / delete (only when it has no products) |
+| `GET` | `/api/operations?type=receipt` | Any | List with `tab` (`todo`,`ready`,`waiting`,`draft`,`done`,`canceled`,`all`), `warehouse`, `search`, `late=1`, `page` |
+| `GET` | `/api/operations/:id` | Any | Operation with availability and shortages (open) or ledger moves (done) |
+| `POST` | `/api/operations` | Any | Create a draft: `type`, `partner`, `sourceLocation` / `destLocation` / `location`, `scheduledDate`, `notes`, `lines: [{ product, quantity }]` |
+| `PATCH` | `/api/operations/:id` | Any | Edit a draft |
+| `POST` | `/api/operations/:id/confirm` | Any | Draft/waiting → `ready` (or `waiting` when stock is short) |
+| `POST` | `/api/operations/:id/pick` | `/pack` | Any | Delivery progress (ready deliveries only, pick before pack) |
+| `POST` | `/api/operations/:id/validate` | Any (adjustments: Manager) | Apply stock changes + write the ledger (transaction) |
+| `POST` | `/api/operations/:id/reset` | `/cancel` | `/duplicate` | Any | Back to draft / cancel / copy as a new draft |
+| `GET` | `/api/stock/available?location=&products=a,b` | Any | On-hand quantities at one location |

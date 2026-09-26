@@ -1,0 +1,138 @@
+<%- include('../layout/app-top') %>
+<% const isEdit = Boolean(product); const p = product || {}; %>
+
+<nav class="text-sm text-slate-500" aria-label="Breadcrumb">
+  <a href="/products" class="hover:text-slate-300">Products</a> <span class="mx-1">/</span>
+  <% if (isEdit) { %><a href="/products/<%= p._id %>" class="hover:text-slate-300"><%= p.name %></a> <span class="mx-1">/</span> <span class="text-slate-300">Edit</span>
+  <% } else { %><span class="text-slate-300">New</span><% } %>
+</nav>
+
+<h1 class="text-2xl font-bold text-white tracking-tight"><%= isEdit ? 'Edit ' + p.name : 'New product' %></h1>
+
+<form id="productForm" class="card p-6 space-y-6 max-w-3xl" novalidate>
+  <div id="formError" class="hidden rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300" role="alert"></div>
+
+  <div class="grid sm:grid-cols-2 gap-5">
+    <div class="sm:col-span-2">
+      <label for="name" class="label">Product name *</label>
+      <input id="name" name="name" class="input" required maxlength="120" value="<%= p.name || '' %>" placeholder="e.g. Steel Rods">
+    </div>
+    <div>
+      <label for="sku" class="label">SKU / Code *</label>
+      <input id="sku" name="sku" class="input font-mono uppercase" required maxlength="40" value="<%= p.sku || '' %>" placeholder="e.g. STEEL-ROD">
+      <p class="text-xs text-slate-500 mt-1">Unique code used for search and on documents.</p>
+    </div>
+    <div>
+      <label for="category" class="label">Category</label>
+      <select id="category" name="category" class="input">
+        <option value="">No category</option>
+        <% categories.forEach((c) => { %>
+          <option value="<%= c._id %>" <%= p.category && String(p.category._id || p.category) === String(c._id) ? 'selected' : '' %>><%= c.name %></option>
+        <% }) %>
+      </select>
+      <p class="text-xs text-slate-500 mt-1"><a href="/categories" class="text-blue-400 hover:text-blue-300">Manage categories</a></p>
+    </div>
+    <div>
+      <label for="uom" class="label">Unit of measure</label>
+      <select id="uom" name="uom" class="input">
+        <% uoms.forEach((u) => { %>
+          <option value="<%= u %>" <%= (p.uom || 'Units') === u ? 'selected' : '' %>><%= u %></option>
+        <% }) %>
+      </select>
+      <% if (isEdit) { %><p class="text-xs text-slate-500 mt-1">Locked once stock has moved.</p><% } %>
+    </div>
+  </div>
+
+  <fieldset class="rounded-xl border border-slate-800 p-4 space-y-4">
+    <legend class="px-2 text-sm font-semibold text-white">Reordering rule</legend>
+    <div class="grid sm:grid-cols-2 gap-5">
+      <div>
+        <label for="reorderLevel" class="label">Reorder level</label>
+        <input id="reorderLevel" name="reorderLevel" type="number" min="0" step="any" class="input" value="<%= p.reorderLevel ?? 0 %>">
+        <p class="text-xs text-slate-500 mt-1">At or below this, the product shows as low stock.</p>
+      </div>
+      <div>
+        <label for="reorderQty" class="label">Reorder quantity</label>
+        <input id="reorderQty" name="reorderQty" type="number" min="0" step="any" class="input" value="<%= p.reorderQty ?? 0 %>">
+        <p class="text-xs text-slate-500 mt-1">Suggested quantity for replenishment receipts.</p>
+      </div>
+    </div>
+  </fieldset>
+
+  <% if (!isEdit) { %>
+    <fieldset class="rounded-xl border border-slate-800 p-4 space-y-4">
+      <legend class="px-2 text-sm font-semibold text-white">Initial stock <span class="font-normal text-slate-500">(optional)</span></legend>
+      <div class="grid sm:grid-cols-2 gap-5">
+        <div>
+          <label for="initialQty" class="label">Quantity on hand</label>
+          <input id="initialQty" name="initialQty" type="number" min="0" step="any" class="input" value="0">
+        </div>
+        <div>
+          <label for="initialLocation" class="label">Stored at</label>
+          <select id="initialLocation" name="initialLocation" class="input">
+            <% locations.forEach((l) => { %>
+              <option value="<%= l._id %>"><%= l.fullName %> (<%= l.warehouse ? l.warehouse.name : '' %>)</option>
+            <% }) %>
+          </select>
+        </div>
+      </div>
+      <p class="text-xs text-slate-500">Recorded as a validated inventory adjustment, so it appears in the stock ledger.</p>
+    </fieldset>
+  <% } %>
+
+  <div>
+    <label for="description" class="label">Description</label>
+    <textarea id="description" name="description" rows="3" maxlength="2000" class="input" placeholder="Optional notes, specifications..."><%= p.description || '' %></textarea>
+  </div>
+
+  <div class="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-2 border-t border-slate-800">
+    <a href="<%= isEdit ? '/products/' + p._id : '/products' %>" class="btn btn-secondary">Cancel</a>
+    <button type="submit" id="submitBtn" class="btn btn-primary"><%= isEdit ? 'Save changes' : 'Create product' %></button>
+  </div>
+</form>
+
+<script>
+  (() => {
+    const form = document.getElementById('productForm');
+    const errorBox = document.getElementById('formError');
+    const submitBtn = document.getElementById('submitBtn');
+    const isEdit = <%= isEdit ? 'true' : 'false' %>;
+    const productId = '<%= isEdit ? p._id : '' %>';
+
+    const showError = (message) => {
+      errorBox.textContent = message;
+      errorBox.classList.remove('hidden');
+      errorBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorBox.classList.add('hidden');
+
+      const data = Object.fromEntries(new FormData(form).entries());
+      if (!data.name.trim() || !data.sku.trim()) {
+        return showError('Product name and SKU are required.');
+      }
+      if (!isEdit) {
+        const qty = Number(data.initialQty || 0);
+        if (qty > 0 && !data.initialLocation) return showError('Choose where the initial stock is stored.');
+        if (qty <= 0) { delete data.initialQty; delete data.initialLocation; }
+      }
+
+      const { api, setBusy, toastAfterNavigation } = window.StockSense;
+      setBusy(submitBtn, true, isEdit ? 'Saving...' : 'Creating...');
+      try {
+        const res = isEdit
+          ? await api('PATCH', '/api/products/' + productId, data)
+          : await api('POST', '/api/products', data);
+        toastAfterNavigation(res.message);
+        window.location.href = '/products/' + res.data.product._id;
+      } catch (err) {
+        showError(err.message);
+        setBusy(submitBtn, false);
+      }
+    });
+  })();
+</script>
+
+<%- include('../layout/app-bottom') %>

@@ -1,6 +1,10 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
+// Browser page requests get redirects / HTML error pages; API and fetch() calls get JSON
+const wantsHtml = (req) =>
+  !req.originalUrl.startsWith('/api/') && req.accepts('html') && !req.xhr && !req.headers['x-requested-with'];
+
 /**
  * Protect routes: Requires valid JWT token in cookies or Authorization header
  */
@@ -15,7 +19,7 @@ const protect = async (req, res, next) => {
 
   if (!token) {
     // If request accepts HTML, redirect to login page
-    if (req.accepts('html') && !req.xhr && !req.headers['x-requested-with']) {
+    if (wantsHtml(req)) {
       return res.redirect('/auth/login?error=Please log in to access this page');
     }
     return res.status(401).json({
@@ -30,7 +34,7 @@ const protect = async (req, res, next) => {
 
     const user = await User.findById(decoded.id).select('-password');
     if (!user) {
-      if (req.accepts('html') && !req.xhr && !req.headers['x-requested-with']) {
+      if (wantsHtml(req)) {
         return res.redirect('/auth/login?error=User account no longer exists');
       }
       return res.status(401).json({
@@ -42,7 +46,7 @@ const protect = async (req, res, next) => {
     req.user = user;
     next();
   } catch (error) {
-    if (req.accepts('html') && !req.xhr && !req.headers['x-requested-with']) {
+    if (wantsHtml(req)) {
       return res.redirect('/auth/login?error=Session expired. Please log in again');
     }
     return res.status(401).json({
@@ -66,7 +70,7 @@ const authorize = (...roles) => {
     }
 
     if (!roles.includes(req.user.role)) {
-      if (req.accepts('html') && !req.xhr && !req.headers['x-requested-with']) {
+      if (wantsHtml(req)) {
         return res.status(403).render('error', {
           title: 'Access Denied',
           message: `Access denied. Role "${req.user.role}" does not have permission to view this page. Required: ${roles.join(' or ')}.`,

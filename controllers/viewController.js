@@ -1,6 +1,7 @@
 /**
  * Controller to handle EJS page rendering
  */
+const Operation = require('../models/Operation');
 
 const getLandingPage = (req, res) => {
   res.render('landing', {
@@ -54,6 +55,21 @@ const getDashboardPage = (req, res) => {
   });
 };
 
+const getProfilePage = async (req, res) => {
+  const mine = { $or: [{ createdBy: req.user._id }, { validatedBy: req.user._id }] };
+  const [created, validated, recent] = await Promise.all([
+    Operation.countDocuments({ createdBy: req.user._id }),
+    Operation.countDocuments({ validatedBy: req.user._id }),
+    Operation.find(mine).sort({ updatedAt: -1 }).limit(8).select('reference type status partner updatedAt').lean(),
+  ]);
+  res.render('profile', {
+    title: 'My Profile - StockSense',
+    activeNav: 'profile',
+    stats: { created, validated },
+    recent,
+  });
+};
+
 module.exports = {
   getLandingPage,
   getLoginPage,
@@ -62,4 +78,5 @@ module.exports = {
   getVerifyOtpPage,
   getResetPasswordPage,
   getDashboardPage,
+  getProfilePage,
 };

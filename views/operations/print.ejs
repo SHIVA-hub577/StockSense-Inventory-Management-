@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <title><%= title %></title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; color: #0f172a; background: #f1f5f9; margin: 0; padding: 24px; }
+    .page { max-width: 800px; margin: 0 auto; background: #fff; padding: 40px; border-radius: 12px; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08); }
+    header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0f172a; padding-bottom: 16px; }
+    .brand { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
+    .brand small { display: block; font-size: 12px; font-weight: 500; color: #64748b; }
+    .doc { text-align: right; }
+    .doc h1 { margin: 0; font-size: 22px; }
+    .doc .ref { font-family: ui-monospace, Consolas, monospace; font-size: 16px; margin-top: 4px; }
+    .status { display: inline-block; margin-top: 6px; padding: 2px 8px; border: 1px solid #94a3b8; border-radius: 6px; font-size: 12px; font-weight: 600; text-transform: uppercase; }
+    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px 32px; margin: 24px 0; font-size: 14px; }
+    .grid dt { color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .grid dd { margin: 2px 0 0; font-weight: 600; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: #475569; border-bottom: 1px solid #cbd5e1; padding: 8px; }
+    td { border-bottom: 1px solid #e2e8f0; padding: 10px 8px; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .mono { font-family: ui-monospace, Consolas, monospace; color: #475569; }
+    .check { width: 18px; height: 18px; border: 1.5px solid #64748b; border-radius: 4px; display: inline-block; }
+    .notes { margin-top: 20px; font-size: 14px; background: #f8fafc; border-radius: 8px; padding: 12px; }
+    .signatures { display: grid; grid-template-columns: repeat(2, 1fr); gap: 48px; margin-top: 56px; font-size: 13px; color: #475569; }
+    .signatures div { border-top: 1px solid #94a3b8; padding-top: 6px; }
+    .toolbar { max-width: 800px; margin: 0 auto 16px; display: flex; justify-content: flex-end; gap: 8px; }
+    .toolbar button, .toolbar a { font: inherit; font-size: 14px; font-weight: 600; padding: 8px 14px; border-radius: 8px; border: 1px solid #cbd5e1; background: #fff; color: #0f172a; cursor: pointer; text-decoration: none; }
+    .toolbar button { background: #2563eb; border-color: #2563eb; color: #fff; }
+    footer { margin-top: 32px; font-size: 11px; color: #94a3b8; text-align: center; }
+    @media print {
+      body { background: #fff; padding: 0; }
+      .page { box-shadow: none; border-radius: 0; padding: 0; max-width: none; }
+      .toolbar { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <a href="/operations/<%= operation._id %>">← Back</a>
+    <button type="button" onclick="window.print()">Print / Save as PDF</button>
+  </div>
+
+  <div class="page">
+    <header>
+      <div class="brand">StockSense<small><%= operation.warehouse ? operation.warehouse.name : '' %><%= operation.warehouse && operation.warehouse.address ? ' · ' + operation.warehouse.address : '' %></small></div>
+      <div class="doc">
+        <h1><%= meta.label %></h1>
+        <div class="ref"><%= operation.reference %></div>
+        <span class="status"><%= STATUS_META[operation.status].label %></span>
+      </div>
+    </header>
+
+    <dl class="grid">
+      <% if (operation.partner) { %><div><dt><%= meta.partnerLabel %></dt><dd><%= operation.partner %></dd></div><% } %>
+      <div><dt>Scheduled date</dt><dd><%= fmtDate(operation.scheduledDate) %></dd></div>
+      <div><dt>From</dt><dd><%= operation.sourceLocation.fullName %></dd></div>
+      <div><dt>To</dt><dd><%= operation.destLocation.fullName %></dd></div>
+      <% if (operation.validatedAt) { %><div><dt>Validated</dt><dd><%= fmtDateTime(operation.validatedAt) %><%= operation.validatedBy ? ' by ' + operation.validatedBy.name : '' %></dd></div><% } %>
+      <div><dt>Printed</dt><dd><%= fmtDateTime(new Date()) %></dd></div>
+    </dl>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 40px">#</th>
+          <th>Product</th>
+          <th>SKU</th>
+          <th class="num">Quantity</th>
+          <th>Unit</th>
+          <th style="width: 60px; text-align: center">Check</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% operation.lines.forEach((line, i) => { %>
+          <tr>
+            <td><%= i + 1 %></td>
+            <td><%= line.product.name %></td>
+            <td class="mono"><%= line.product.sku %></td>
+            <td class="num"><strong><%= fmtQty(line.quantity) %></strong></td>
+            <td><%= line.product.uom %></td>
+            <td style="text-align: center"><span class="check"></span></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+
+    <% if (operation.notes) { %><div class="notes"><strong>Notes:</strong> <%= operation.notes %></div><% } %>
+
+    <div class="signatures">
+      <div><%= operation.type === 'receipt' ? 'Received by' : operation.type === 'delivery' ? 'Dispatched by' : 'Moved by' %></div>
+      <div><%= operation.type === 'receipt' ? 'Supplier signature' : operation.type === 'delivery' ? 'Customer signature' : 'Checked by' %></div>
+    </div>
+
+    <footer>Generated by StockSense · <%= operation.reference %></footer>
+  </div>
+</body>
+</html>

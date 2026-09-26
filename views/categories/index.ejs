@@ -1,0 +1,152 @@
+<%- include('../layout/app-top') %>
+<% const isManager = user.role === 'manager'; %>
+
+<div>
+  <h1 class="text-2xl font-bold text-white tracking-tight">Categories</h1>
+  <p class="text-sm text-slate-400 mt-1">Group products for filtering and reporting.</p>
+</div>
+
+<% if (isManager) { %>
+  <form id="addCategory" class="card p-4 flex flex-col md:flex-row gap-3" novalidate>
+    <input name="name" class="input md:w-64" placeholder="New category name" maxlength="60" required aria-label="Category name">
+    <input name="description" class="input flex-1" placeholder="Description (optional)" maxlength="200" aria-label="Category description">
+    <button type="submit" class="btn btn-primary"><%- icon('plus', 'w-4 h-4') %> Add category</button>
+  </form>
+<% } %>
+
+<div class="card overflow-hidden">
+  <% if (categories.length === 0) { %>
+    <p class="p-10 text-center text-slate-400">No categories yet.</p>
+  <% } else { %>
+    <div class="overflow-x-auto">
+      <table class="min-w-full">
+        <thead class="bg-slate-900/80">
+          <tr>
+            <th class="th">Name</th>
+            <th class="th">Description</th>
+            <th class="th text-right">Products</th>
+            <% if (isManager) { %><th class="th"><span class="sr-only">Actions</span></th><% } %>
+          </tr>
+        </thead>
+        <tbody>
+          <% categories.forEach((c) => { %>
+            <tr class="border-t border-slate-800" data-category-id="<%= c._id %>">
+              <td class="td">
+                <span data-view class="font-semibold text-white"><%= c.name %></span>
+                <input data-edit name="name" class="input hidden" value="<%= c.name %>" maxlength="60" aria-label="Category name">
+              </td>
+              <td class="td text-slate-400">
+                <span data-view><%= c.description || '—' %></span>
+                <input data-edit name="description" class="input hidden" value="<%= c.description || '' %>" maxlength="200" aria-label="Category description">
+              </td>
+              <td class="td text-right">
+                <a href="/products?category=<%= c._id %>" class="text-blue-300 hover:text-blue-200 tabular-nums"><%= c.productCount %></a>
+              </td>
+              <% if (isManager) { %>
+                <td class="td text-right whitespace-nowrap">
+                  <span data-view>
+                    <button type="button" class="btn btn-secondary btn-sm" data-action="edit">Edit</button>
+                    <button type="button" class="btn btn-danger btn-sm" data-action="delete" data-name="<%= c.name %>">Delete</button>
+                  </span>
+                  <span data-edit class="hidden">
+                    <button type="button" class="btn btn-primary btn-sm" data-action="save">Save</button>
+                    <button type="button" class="btn btn-secondary btn-sm" data-action="cancel">Cancel</button>
+                  </span>
+                </td>
+              <% } %>
+            </tr>
+          <% }) %>
+          <% if (uncategorised > 0) { %>
+            <tr class="border-t border-slate-800">
+              <td class="td italic text-slate-500">No category</td>
+              <td class="td text-slate-500">Products without a category</td>
+              <td class="td text-right tabular-nums text-slate-400"><%= uncategorised %></td>
+              <% if (isManager) { %><td class="td"></td><% } %>
+            </tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>
+
+<% if (isManager) { %>
+<script>
+  (() => {
+    const { api, toast, toastAfterNavigation, confirmDialog, setBusy } = window.StockSense;
+
+    document.getElementById('addCategory').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const data = Object.fromEntries(new FormData(form).entries());
+      if (!data.name.trim()) return toast('Enter a category name', 'error');
+      const button = form.querySelector('button[type=submit]');
+      setBusy(button, true, 'Adding...');
+      try {
+        const res = await api('POST', '/api/categories', data);
+        toastAfterNavigation(res.message);
+        window.location.reload();
+      } catch (err) {
+        toast(err.message, 'error');
+        setBusy(button, false);
+      }
+    });
+
+    const toggleEdit = (row, editing) => {
+      row.querySelectorAll('[data-view]').forEach((el) => el.classList.toggle('hidden', editing));
+      row.querySelectorAll('[data-edit]').forEach((el) => el.classList.toggle('hidden', !editing));
+      if (editing) row.querySelector('input[name=name]').focus();
+    };
+
+    document.querySelectorAll('[data-category-id]').forEach((row) => {
+      const id = row.dataset.categoryId;
+      row.addEventListener('click', async (e) => {
+        const button = e.target.closest('[data-action]');
+        if (!button) return;
+        const action = button.dataset.action;
+
+        if (action === 'edit') return toggleEdit(row, true);
+        if (action === 'cancel') return toggleEdit(row, false);
+
+        if (action === 'save') {
+          const body = {
+            name: row.querySelector('input[name=name]').value,
+            description: row.querySelector('input[name=description]').value,
+          };
+          if (!body.name.trim()) return toast('Category name cannot be empty', 'error');
+          setBusy(button, true, 'Saving...');
+          try {
+            const res = await api('PATCH', '/api/categories/' + id, body);
+            toastAfterNavigation(res.message);
+            window.location.reload();
+          } catch (err) {
+            toast(err.message, 'error');
+            setBusy(button, false);
+          }
+        }
+
+        if (action === 'delete') {
+          const ok = await confirmDialog({
+            title: 'Delete category?',
+            message: `"${button.dataset.name}" will be removed. Categories that still have products cannot be deleted.`,
+            confirmLabel: 'Delete',
+            danger: true,
+          });
+          if (!ok) return;
+          setBusy(button, true, 'Deleting...');
+          try {
+            const res = await api('DELETE', '/api/categories/' + id);
+            toastAfterNavigation(res.message);
+            window.location.reload();
+          } catch (err) {
+            toast(err.message, 'error');
+            setBusy(button, false);
+          }
+        }
+      });
+    });
+  })();
+</script>
+<% } %>
+
+<%- include('../layout/app-bottom') %>

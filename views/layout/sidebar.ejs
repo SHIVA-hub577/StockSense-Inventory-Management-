@@ -1,0 +1,73 @@
+<%
+  const nav = typeof navCounts !== 'undefined' ? navCounts : {};
+  const current = typeof activeNav !== 'undefined' ? activeNav : '';
+  const sections = [
+    { title: null, items: [
+      { key: 'dashboard', href: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
+    ] },
+    { title: 'Inventory', items: [
+      { key: 'products', href: '/products', label: 'Products', icon: 'products', badge: nav.stockAlerts, tone: 'amber', badgeTitle: 'Products low or out of stock' },
+      { key: 'categories', href: '/categories', label: 'Categories', icon: 'categories' },
+    ] },
+    { title: 'Operations', items: [
+      { key: 'receipts', href: '/receipts', label: 'Receipts', icon: 'receipts', badge: nav.receipt, badgeTitle: 'Receipts to process' },
+      { key: 'deliveries', href: '/deliveries', label: 'Delivery Orders', icon: 'deliveries', badge: nav.delivery, badgeTitle: 'Deliveries to process' },
+      { key: 'transfers', href: '/transfers', label: 'Internal Transfers', icon: 'transfers', badge: nav.internal, badgeTitle: 'Transfers to process' },
+      { key: 'adjustments', label: 'Adjustments', icon: 'adjustments', soon: true },
+      { key: 'history', label: 'Move History', icon: 'history', soon: true },
+    ] },
+    { title: 'Settings', items: [
+      { key: 'warehouses', label: 'Warehouses', icon: 'warehouses', soon: true },
+    ] },
+  ];
+%>
+<aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-64 -translate-x-full lg:translate-x-0 transition-transform duration-200 bg-slate-950 border-r border-slate-800 flex flex-col" aria-label="Main navigation">
+  <a href="/dashboard" class="h-16 shrink-0 flex items-center gap-3 px-5 border-b border-slate-800">
+    <span class="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold shadow-lg shadow-blue-500/30">SS</span>
+    <span class="text-lg font-bold text-white tracking-tight">StockSense</span>
+  </a>
+
+  <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-6">
+    <% sections.forEach((section) => { %>
+      <div class="space-y-1">
+        <% if (section.title) { %>
+          <p class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500"><%= section.title %></p>
+        <% } %>
+        <% section.items.forEach((item) => { %>
+          <% if (item.soon) { %>
+            <span class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-600 cursor-not-allowed" title="Coming soon">
+              <%- icon(item.icon, 'w-5 h-5 shrink-0') %>
+              <span class="flex-1 truncate"><%= item.label %></span>
+              <span class="text-[10px] font-semibold uppercase tracking-wide text-slate-600 border border-slate-800 rounded px-1.5 py-0.5">Soon</span>
+            </span>
+          <% } else { %>
+            <% const active = current === item.key; %>
+            <a href="<%= item.href %>"
+               class="group flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors <%= active ? 'bg-blue-600/15 text-white ring-1 ring-blue-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' %>"
+               <%= active ? 'aria-current=page' : '' %>>
+              <span class="<%= active ? 'text-blue-400' : 'text-slate-500 group-hover:text-slate-300' %>"><%- icon(item.icon, 'w-5 h-5 shrink-0') %></span>
+              <span class="flex-1 truncate"><%= item.label %></span>
+              <% if (item.badge) { %>
+                <span class="min-w-[1.5rem] text-center text-[11px] font-bold rounded-full px-1.5 py-0.5 <%= item.tone === 'amber' ? 'bg-amber-500/15 text-amber-400' : 'bg-blue-500/15 text-blue-300' %>" title="<%= item.badgeTitle %>"><%= item.badge %></span>
+              <% } %>
+            </a>
+          <% } %>
+        <% }) %>
+      </div>
+    <% }) %>
+  </nav>
+
+  <!-- Profile menu -->
+  <div class="shrink-0 border-t border-slate-800 p-3 space-y-1">
+    <a href="/profile" class="flex items-center gap-3 px-3 py-2 rounded-lg transition-colors <%= current === 'profile' ? 'bg-blue-600/15 ring-1 ring-blue-500/30' : 'hover:bg-slate-800/60' %>">
+      <span class="w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-xs font-bold <%= user.role === 'manager' ? 'bg-purple-500/20 text-purple-300' : 'bg-amber-500/20 text-amber-300' %>"><%= initials(user.name) %></span>
+      <span class="min-w-0">
+        <span class="block text-sm font-semibold text-white truncate"><%= user.name %></span>
+        <span class="block text-xs <%= user.role === 'manager' ? 'text-purple-400' : 'text-amber-400' %>"><%= user.role === 'manager' ? 'Inventory Manager' : 'Warehouse Staff' %></span>
+      </span>
+    </a>
+    <a href="/auth/logout" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors">
+      <%- icon('logout', 'w-5 h-5 shrink-0') %> Sign out
+    </a>
+  </div>
+</aside>

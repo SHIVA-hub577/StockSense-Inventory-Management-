@@ -1,0 +1,17 @@
+<%- include('header') %>
+<script src="/js/app.js"></script>
+
+<div class="flex-1 flex w-full">
+  <div id="sidebar-backdrop" class="fixed inset-0 z-30 bg-black/60 hidden lg:hidden"></div>
+  <%- include('sidebar') %>
+
+  <div class="flex-1 min-w-0 flex flex-col lg:pl-64">
+    <!-- Mobile top bar -->
+    <header class="lg:hidden sticky top-0 z-20 h-14 flex items-center gap-3 px-4 border-b border-slate-800 bg-slate-950/90 backdrop-blur">
+      <button id="sidebar-open" type="button" class="p-2 -ml-2 rounded-lg text-slate-300 hover:bg-slate-800" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">
+        <%- icon('menu', 'w-6 h-6') %>
+      </button>
+      <a href="/dashboard" class="font-bold text-white">StockSense</a>
+    </header>
+
+    <main class="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8 space-y-6">

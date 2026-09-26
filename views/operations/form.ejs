@@ -1,0 +1,108 @@
+<%- include('../layout/app-top') %>
+<%
+  const isEdit = Boolean(operation);
+  const op = operation || {};
+  const idOf = (v) => (v && v._id ? String(v._id) : v ? String(v) : '');
+  const needsSource = type === 'delivery' || type === 'internal';
+  const needsDest = type === 'receipt' || type === 'internal';
+  const locationsByWarehouse = {};
+  locations.forEach((l) => {
+    const key = l.warehouse ? `${l.warehouse.name} (${l.warehouse.code})` : 'Other';
+    (locationsByWarehouse[key] = locationsByWarehouse[key] || []).push(l);
+  });
+  const locationSelect = (name, label, selected, help) => ({ name, label, selected, help });
+  const selects = [];
+  if (needsSource) selects.push(locationSelect('sourceLocation', type === 'internal' ? 'From location *' : 'Ship from *', idOf(op.sourceLocation), 'Stock is taken from here'));
+  if (needsDest) selects.push(locationSelect('destLocation', type === 'internal' ? 'To location *' : 'Receive into *', idOf(op.destLocation), 'Stock is added here'));
+  const initialLines = isEdit
+    ? op.lines.map((l) => ({ product: idOf(l.product), quantity: l.quantity }))
+    : prefill.lines;
+%>
+
+<nav class="text-sm text-slate-500" aria-label="Breadcrumb">
+  <a href="/<%= meta.slug %>" class="hover:text-slate-300"><%= meta.plural %></a> <span class="mx-1">/</span>
+  <% if (isEdit) { %><a href="/operations/<%= op._id %>" class="hover:text-slate-300 font-mono"><%= op.reference %></a> <span class="mx-1">/</span> <span class="text-slate-300">Edit</span>
+  <% } else { %><span class="text-slate-300">New</span><% } %>
+</nav>
+
+<h1 class="text-2xl font-bold text-white tracking-tight"><%= isEdit ? 'Edit ' + op.reference : 'New ' + meta.label.toLowerCase() %></h1>
+
+<form id="operationForm" class="space-y-6" novalidate>
+  <div id="formError" class="hidden rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300" role="alert"></div>
+
+  <section class="card p-6 grid md:grid-cols-2 gap-5">
+    <div>
+      <label for="partner" class="label"><%= meta.partnerLabel %><%= type === 'internal' ? '' : ' *' %></label>
+      <input id="partner" name="partner" class="input" list="partnerList" maxlength="200" value="<%= op.partner || '' %>"
+             placeholder="<%= type === 'receipt' ? 'e.g. Tata Steel' : type === 'delivery' ? 'e.g. Acme Builders' : 'Optional' %>" autocomplete="off">
+      <datalist id="partnerList">
+        <% partners.forEach((name) => { %><option value="<%= name %>"></option><% }) %>
+      </datalist>
+    </div>
+    <div>
+      <label for="scheduledDate" class="label">Scheduled date</label>
+      <input id="scheduledDate" name="scheduledDate" type="date" class="input" value="<%= toDateInput(op.scheduledDate) %>">
+    </div>
+    <% selects.forEach((s) => { %>
+      <div>
+        <label for="<%= s.name %>" class="label"><%= s.label %></label>
+        <select id="<%= s.name %>" name="<%= s.name %>" class="input" required>
+          <option value="">Choose a location</option>
+          <% Object.entries(locationsByWarehouse).forEach(([warehouseName, locs]) => { %>
+            <optgroup label="<%= warehouseName %>">
+              <% locs.forEach((l) => { %>
+                <option value="<%= l._id %>" <%= s.selected === String(l._id) ? 'selected' : '' %>><%= l.fullName %></option>
+              <% }) %>
+            </optgroup>
+          <% }) %>
+        </select>
+        <p class="text-xs text-slate-500 mt-1"><%= s.help %></p>
+      </div>
+    <% }) %>
+    <div class="md:col-span-2">
+      <label for="notes" class="label">Notes</label>
+      <textarea id="notes" name="notes" rows="2" maxlength="500" class="input" placeholder="Optional instructions or references"><%= op.notes || '' %></textarea>
+    </div>
+  </section>
+
+  <section class="card overflow-hidden">
+    <div class="flex items-center justify-between px-4 py-3 border-b border-slate-800">
+      <h2 class="text-sm font-semibold text-white">Products</h2>
+      <% if (needsSource) { %><p class="text-xs text-slate-500" id="availabilityHint">Availability is checked at the source location.</p><% } %>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="min-w-full">
+        <thead class="bg-slate-900/80">
+          <tr>
+            <th class="th w-1/2">Product</th>
+            <th class="th w-40">Quantity</th>
+            <th class="th">Unit</th>
+            <% if (needsSource) { %><th class="th">Available</th><% } %>
+            <th class="th"><span class="sr-only">Remove</span></th>
+          </tr>
+        </thead>
+        <tbody id="lines"></tbody>
+      </table>
+    </div>
+    <div class="px-4 py-3 border-t border-slate-800">
+      <button type="button" id="addLine" class="btn btn-secondary btn-sm"><%- icon('plus', 'w-4 h-4') %> Add product</button>
+    </div>
+  </section>
+
+  <div class="flex flex-col-reverse sm:flex-row justify-end gap-3">
+    <a href="<%= isEdit ? '/operations/' + op._id : '/' + meta.slug %>" class="btn btn-secondary">Cancel</a>
+    <button type="submit" class="btn btn-secondary" data-submit="draft">Save as draft</button>
+    <button type="submit" class="btn btn-primary" data-submit="confirm">Save &amp; mark as To Do</button>
+  </div>
+</form>
+
+<script type="application/json" id="operationFormData"><%- jsonForScript({
+  type,
+  operationId: isEdit ? String(op._id) : null,
+  needsSource,
+  products,
+  lines: initialLines,
+}) %></script>
+<script src="/js/operation-form.js"></script>
+
+<%- include('../layout/app-bottom') %>

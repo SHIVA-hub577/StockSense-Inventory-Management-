@@ -375,7 +375,9 @@ const confirmOperation = async (operationId) => {
 
 /**
  * Validate an operation: apply its stock changes, write the ledger and mark it done.
- * Works from draft, waiting or ready. All-or-nothing (transaction).
+ * Receipts, transfers and adjustments work from draft, waiting or ready.
+ * Deliveries follow pick -> pack -> validate, so they must be ready and packed.
+ * All-or-nothing (transaction).
  */
 const validateOperation = async (operationId, user = null) => {
   let validated;
@@ -384,6 +386,15 @@ const validateOperation = async (operationId, user = null) => {
     await mongoose.connection.transaction(async (session) => {
       const operation = await findOperationOr404(operationId, session);
       assertOpen(operation, 'validate');
+
+      if (operation.type === 'delivery' && (operation.status !== 'ready' || !operation.packedAt)) {
+        throw new AppError(
+          operation.status === 'ready'
+            ? `Pick and pack ${operation.reference} before validating it`
+            : `${operation.reference} must be ready (stock available), picked and packed before validating`,
+          409
+        );
+      }
 
       const shortages = await findShortages(operation, session);
       if (shortages.length) {
@@ -503,6 +514,96 @@ const cancelOperation = async (operationId) => {
 };
 
 /**
+ * Put a waiting/ready operation back to draft so it can be edited.
+ * Clears pick/pack progress.
+ */
+const resetToDraft = async (operationId) => {
+  const operation = await findOperationOr404(operationId);
+  if (!['waiting', 'ready'].includes(operation.status)) {
+    throw new AppError(`Only waiting or ready operations can be reset to draft (${operation.reference} is ${operation.status})`, 409);
+  }
+  operation.status = 'draft';
+  operation.pickedAt = null;
+  operation.pickedBy = null;
+  operation.packedAt = null;
+  operation.packedBy = null;
+  await operation.save();
+  return operation;
+};
+
+/**
+ * Delivery progress: mark a ready delivery as picked, then packed.
+ * @param {'pick'|'pack'} step
+ */
+const markDeliveryStep = async (operationId, step, user = null) => {
+  const operation = await findOperationOr404(operationId);
+  if (operation.type !== 'delivery') {
+    throw new AppError('Only delivery orders are picked and packed');
+  }
+  if (operation.status !== 'ready') {
+    throw new AppError(`${operation.reference} must be ready (stock available) before it can be ${step === 'pick' ? 'picked' : 'packed'}`, 409);
+  }
+
+  if (step === 'pick') {
+    if (operation.pickedAt) {
+      throw new AppError(`${operation.reference} is already picked`, 409);
+    }
+    operation.pickedAt = new Date();
+    operation.pickedBy = toId(user);
+  } else if (step === 'pack') {
+    if (!operation.pickedAt) {
+      throw new AppError(`Pick the items of ${operation.reference} before packing`, 409);
+    }
+    if (operation.packedAt) {
+      throw new AppError(`${operation.reference} is already packed`, 409);
+    }
+    operation.packedAt = new Date();
+    operation.packedBy = toId(user);
+  } else {
+    throw new AppError('Unknown delivery step');
+  }
+
+  await operation.save();
+  return operation;
+};
+
+/**
+ * Create a new draft copying an operation's type, partner, locations and lines
+ * (e.g. a repeat order). Scheduled for today.
+ */
+const duplicateOperation = async (operationId, user = null) => {
+  const original = await findOperationOr404(operationId);
+  if (original.type === 'adjustment') {
+    // A count is only valid at the moment it was taken; re-applying it would reset stock
+    throw new AppError('Inventory adjustments cannot be duplicated - record a new count instead', 409);
+  }
+  return createOperation(
+    {
+      type: original.type,
+      partner: original.partner,
+      sourceLocation: original.sourceLocation,
+      destLocation: original.destLocation,
+      notes:original.notes ? `Copy of ${original.reference}: ${original.notes}` : `Copy of ${original.reference}`,
+      lines: original.lines.map((line) => ({ product: line.product, quantity: line.quantity })),
+    },
+    user
+  );
+};
+
+/**
+ * On-hand quantity of some products at one location.
+ * @returns {Promise<Map<string, number>>} productId -> quantity (0 when none)
+ */
+const getAvailableAt = async (locationId, productIds = []) => {
+  const quants = await StockQuant.find({ location: locationId, product: { $in: productIds } })
+    .select('product quantity')
+    .lean();
+  const map = new Map(productIds.map((id) => [String(id), 0]));
+  quants.forEach((q) => map.set(q.product.toString(), roundQty(q.quantity)));
+  return map;
+};
+
+/**
  * Total on-hand quantity per product across internal locations.
  * @param {Object} [filter] { productIds, warehouseId }
  * @returns {Promise<Map<string, number>>} productId -> quantity
@@ -540,7 +641,11 @@ module.exports = {
   confirmOperation,
   validateOperation,
   cancelOperation,
+  resetToDraft,
+  markDeliveryStep,
+  duplicateOperation,
   findShortages,
+  getAvailableAt,
   getOnHandTotals,
   getStockByLocation,
   roundQty,

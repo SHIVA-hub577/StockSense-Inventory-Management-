@@ -1,0 +1,203 @@
+<%- include('../layout/app-top') %>
+<%
+  const isManager = user.role === 'manager';
+  const st = STOCK_STATUS_META[stockStatus];
+  const suggestion = reorderSuggestion({ ...product, onHand });
+  // Direction of a ledger row from this product's point of view
+  const moveDirection = (m) => {
+    const fromInternal = m.fromLocation && m.fromLocation.type === 'internal';
+    const toInternal = m.toLocation && m.toLocation.type === 'internal';
+    if (fromInternal && toInternal) return { sign: '⇄', classes: 'text-blue-300' };
+    if (toInternal) return { sign: '+', classes: 'text-emerald-400' };
+    return { sign: '−', classes: 'text-red-400' };
+  };
+%>
+
+<nav class="text-sm text-slate-500" aria-label="Breadcrumb">
+  <a href="/products" class="hover:text-slate-300">Products</a> <span class="mx-1">/</span> <span class="text-slate-300"><%= product.name %></span>
+</nav>
+
+<div class="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+  <div class="space-y-2">
+    <div class="flex flex-wrap items-center gap-3">
+      <h1 class="text-2xl font-bold text-white tracking-tight"><%= product.name %></h1>
+      <span class="badge <%= st.classes %>"><%= st.label %></span>
+      <% if (!product.isActive) { %><span class="badge bg-slate-500/10 text-slate-400 border-slate-500/30">Archived</span><% } %>
+    </div>
+    <p class="text-sm text-slate-400">
+      <span class="font-mono text-slate-300"><%= product.sku %></span>
+      · <%= product.category ? product.category.name : 'No category' %>
+      · Measured in <%= product.uom %>
+    </p>
+  </div>
+  <div class="flex flex-wrap gap-2">
+    <% if (product.isActive) { %>
+      <a href="/receipts/new?product=<%= product._id %>&qty=<%= suggestion %>" class="btn <%= stockStatus === 'ok' ? 'btn-secondary' : 'btn-primary' %>"><%- icon('receipts', 'w-4 h-4') %> Reorder</a>
+      <a href="/deliveries/new?product=<%= product._id %>" class="btn btn-secondary"><%- icon('deliveries', 'w-4 h-4') %> Deliver</a>
+    <% } %>
+    <% if (isManager) { %>
+      <a href="/products/<%= product._id %>/edit" class="btn btn-secondary"><%- icon('pencil', 'w-4 h-4') %> Edit</a>
+      <% if (product.isActive) { %>
+        <button type="button" class="btn btn-danger" data-product-action="archive"><%- icon('archive', 'w-4 h-4') %> Archive</button>
+      <% } else { %>
+        <button type="button" class="btn btn-success" data-product-action="restore">Restore</button>
+      <% } %>
+    <% } %>
+  </div>
+</div>
+
+<% if (stockStatus !== 'ok' && product.isActive) { %>
+  <div class="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200 flex items-start gap-3" role="status">
+    <%- icon('warning', 'w-5 h-5 shrink-0 text-amber-400') %>
+    <p>
+      <% if (stockStatus === 'out') { %>Out of stock.<% } else { %>Only <%= fmtQty(onHand) %> <%= product.uom %> left (reorder level <%= fmtQty(product.reorderLevel) %>).<% } %>
+      <% if (incoming > 0) { %><%= fmtQty(incoming) %> <%= product.uom %> already incoming.<% } %>
+      Suggested reorder: <strong><%= fmtQty(suggestion) %> <%= product.uom %></strong>.
+    </p>
+  </div>
+<% } %>
+
+<!-- Stock summary -->
+<div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
+  <% [
+    { label: 'On hand', value: onHand, hint: 'across all locations', tone: 'text-white' },
+    { label: 'Incoming', value: incoming, hint: 'confirmed receipts', tone: 'text-emerald-400' },
+    { label: 'Outgoing', value: outgoing, hint: 'confirmed deliveries', tone: 'text-red-400' },
+    { label: 'Forecast', value: forecast, hint: forecast < 0 ? 'deliveries exceed stock' : 'on hand + in − out', tone: forecast < 0 ? 'text-red-400' : forecast <= product.reorderLevel ? 'text-amber-400' : 'text-blue-300' },
+  ].forEach((k) => { %>
+    <div class="card p-4">
+      <p class="text-xs font-semibold uppercase tracking-wider text-slate-400"><%= k.label %></p>
+      <p class="mt-2 text-2xl font-bold tabular-nums <%= k.tone %>"><%= fmtQty(k.value) %> <span class="text-sm font-medium text-slate-500"><%= product.uom %></span></p>
+      <p class="text-xs text-slate-500 mt-1"><%= k.hint %></p>
+    </div>
+  <% }) %>
+  <div class="card p-4 col-span-2 lg:col-span-1">
+    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Reordering rule</p>
+    <p class="mt-2 text-sm text-slate-300">Reorder at <strong class="text-white"><%= fmtQty(product.reorderLevel) %></strong> <%= product.uom %></p>
+    <p class="text-sm text-slate-300">Order <strong class="text-white"><%= product.reorderQty ? fmtQty(product.reorderQty) : '—' %></strong> <%= product.reorderQty ? product.uom : '' %></p>
+  </div>
+</div>
+
+<div class="grid lg:grid-cols-2 gap-6">
+  <!-- Stock per location -->
+  <section class="card overflow-hidden">
+    <h2 class="px-4 py-3 border-b border-slate-800 text-sm font-semibold text-white">Stock by location</h2>
+    <% if (locations.length === 0) { %>
+      <p class="p-6 text-sm text-slate-400">No stock in any location.</p>
+    <% } else { %>
+      <table class="min-w-full">
+        <thead><tr><th class="th">Location</th><th class="th text-right">Quantity</th><th class="th text-right">Share</th></tr></thead>
+        <tbody>
+          <% locations.forEach((q) => { const share = onHand > 0 ? Math.round((q.quantity / onHand) * 100) : 0; %>
+            <tr class="border-t border-slate-800">
+              <td class="td font-medium"><%= q.location.fullName %></td>
+              <td class="td text-right tabular-nums"><%= fmtQty(q.quantity) %> <span class="text-xs text-slate-500"><%= product.uom %></span></td>
+              <td class="td text-right w-40">
+                <div class="flex items-center gap-2 justify-end">
+                  <div class="w-20 h-1.5 rounded-full bg-slate-800 overflow-hidden"><div class="h-full bg-blue-500" style="width: <%= share %>%"></div></div>
+                  <span class="text-xs text-slate-400 tabular-nums w-9 text-right"><%= share %>%</span>
+                </div>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% } %>
+  </section>
+
+  <!-- Open operations -->
+  <section class="card overflow-hidden">
+    <h2 class="px-4 py-3 border-b border-slate-800 text-sm font-semibold text-white">Open operations</h2>
+    <% if (openOperations.length === 0) { %>
+      <p class="p-6 text-sm text-slate-400">Nothing scheduled for this product.</p>
+    <% } else { %>
+      <div class="overflow-x-auto">
+        <table class="min-w-full">
+          <thead><tr><th class="th">Reference</th><th class="th">Scheduled</th><th class="th text-right">Qty</th><th class="th">Status</th></tr></thead>
+          <tbody>
+            <% openOperations.forEach((op) => { %>
+              <tr class="border-t border-slate-800 hover:bg-slate-800/30">
+                <td class="td">
+                  <a href="/operations/<%= op._id %>" class="font-mono text-blue-300 hover:text-blue-200"><%= op.reference %></a>
+                  <div class="text-xs text-slate-500"><%= OPERATION_META[op.type].label %><%= op.partner ? ' · ' + op.partner : '' %></div>
+                </td>
+                <td class="td text-slate-400 whitespace-nowrap">
+                  <%= fmtDate(op.scheduledDate) %>
+                  <% if (isLate(op)) { %><span class="badge bg-red-500/10 text-red-400 border-red-500/30 ml-1">Late</span><% } %>
+                </td>
+                <td class="td text-right tabular-nums <%= op.type === 'receipt' ? 'text-emerald-400' : op.type === 'delivery' ? 'text-red-400' : '' %>">
+                  <%= op.type === 'receipt' ? '+' : op.type === 'delivery' ? '−' : '' %><%= fmtQty(op.productQty) %>
+                </td>
+                <td class="td"><span class="badge <%= STATUS_META[op.status].classes %>"><%= STATUS_META[op.status].label %></span></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </section>
+</div>
+
+<!-- Recent moves -->
+<section class="card overflow-hidden">
+  <h2 class="px-4 py-3 border-b border-slate-800 text-sm font-semibold text-white">Recent stock moves</h2>
+  <% if (moves.length === 0) { %>
+    <p class="p-6 text-sm text-slate-400">No stock has moved for this product yet.</p>
+  <% } else { %>
+    <div class="overflow-x-auto">
+      <table class="min-w-full">
+        <thead><tr><th class="th">Date</th><th class="th">Reference</th><th class="th">From</th><th class="th">To</th><th class="th text-right">Quantity</th><th class="th">By</th></tr></thead>
+        <tbody>
+          <% moves.forEach((m) => { const dir = moveDirection(m); %>
+            <tr class="border-t border-slate-800">
+              <td class="td text-slate-400 whitespace-nowrap"><%= fmtDateTime(m.date) %></td>
+              <td class="td"><a href="/operations/<%= m.operation %>" class="font-mono text-blue-300 hover:text-blue-200"><%= m.reference %></a></td>
+              <td class="td text-slate-300"><%= m.fromLocation ? m.fromLocation.fullName : '—' %></td>
+              <td class="td text-slate-300"><%= m.toLocation ? m.toLocation.fullName : '—' %></td>
+              <td class="td text-right tabular-nums font-semibold <%= dir.classes %>"><%= dir.sign %> <%= fmtQty(m.quantity) %></td>
+              <td class="td text-slate-400"><%= m.user ? m.user.name : '—' %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</section>
+
+<% if (product.description) { %>
+  <section class="card p-4">
+    <h2 class="text-sm font-semibold text-white mb-2">Description</h2>
+    <p class="text-sm text-slate-300 whitespace-pre-line"><%= product.description %></p>
+  </section>
+<% } %>
+
+<% if (isManager) { %>
+<script>
+  document.querySelectorAll('[data-product-action]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const action = button.dataset.productAction;
+      const { api, confirmDialog, setBusy, toast, toastAfterNavigation } = window.StockSense;
+      if (action === 'archive') {
+        const ok = await confirmDialog({
+          title: 'Archive this product?',
+          message: 'It will be hidden from product lists and cannot be used in new operations. You can restore it later.',
+          confirmLabel: 'Archive',
+          danger: true,
+        });
+        if (!ok) return;
+      }
+      setBusy(button, true);
+      try {
+        const res = await api('POST', '/api/products/<%= product._id %>/' + action);
+        toastAfterNavigation(res.message);
+        window.location.reload();
+      } catch (err) {
+        toast(err.message, 'error');
+        setBusy(button, false);
+      }
+    });
+  });
+</script>
+<% } %>
+
+<%- include('../layout/app-bottom') %>

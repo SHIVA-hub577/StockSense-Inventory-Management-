@@ -62,8 +62,15 @@ const operation = async (data, { user, finalStatus = 'done', date = new Date() }
   const op = await stock.createOperation({ ...data, scheduledDate: date }, user);
 
   if (finalStatus === 'done') {
+    if (data.type === 'delivery') {
+      // Deliveries follow pick -> pack -> validate
+      await stock.confirmOperation(op._id);
+      await stock.markDeliveryStep(op._id, 'pick', user);
+      await stock.markDeliveryStep(op._id, 'pack', user);
+    }
     await stock.validateOperation(op._id, user);
-    await Operation.updateOne({ _id: op._id }, { validatedAt: date });
+    const dates = data.type === 'delivery' ? { validatedAt: date, pickedAt: date, packedAt: date } : { validatedAt: date };
+    await Operation.updateOne({ _id: op._id }, dates);
     await StockMove.updateMany({ operation: op._id }, { date });
   } else if (finalStatus === 'ready' || finalStatus === 'waiting') {
     const { operation: confirmed } = await stock.confirmOperation(op._id);

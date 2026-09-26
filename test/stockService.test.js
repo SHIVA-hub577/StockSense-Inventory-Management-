@@ -27,9 +27,19 @@ const onHand = async (product, location) => {
   return quant ? quant.quantity : 0;
 };
 
+// Deliveries follow confirm -> pick -> pack before they can be validated
+const pickAndPack = async (id) => {
+  await stock.confirmOperation(id);
+  await stock.markDeliveryStep(id, 'pick');
+  await stock.markDeliveryStep(id, 'pack');
+};
+
 // create + validate in one go
 const done = async (data) => {
   const op = await stock.createOperation(data);
+  if (data.type === 'delivery') {
+    await pickAndPack(op._id);
+  }
   return stock.validateOperation(op._id);
 };
 
@@ -115,7 +125,7 @@ test('references are sequential per warehouse and operation type', async () => {
   assert.ok([r1, r2, d1, t1, a1].every((op) => op.status === 'draft' && op.warehouse.equals(wh._id)));
 });
 
-test('delivery without enough stock: confirm -> waiting, validate refused, nothing changes', async () => {
+test('not enough stock: delivery waits, validation is refused, nothing changes', async () => {
   await done({ type: 'receipt', destLocation: mainStore._id, lines: [{ product: steel._id, quantity: 5 }] });
 
   const delivery = await stock.createOperation({
@@ -125,15 +135,72 @@ test('delivery without enough stock: confirm -> waiting, validate refused, nothi
   const { operation, shortages } = await stock.confirmOperation(delivery._id);
   assert.equal(operation.status, 'waiting');
   assert.deepEqual(shortages.map((s) => [s.sku, s.required, s.available]), [['STEEL-KG', 20, 5]]);
+  await assert.rejects(stock.markDeliveryStep(delivery._id, 'pick'), /must be ready/);
+  await assert.rejects(stock.validateOperation(delivery._id), /must be ready \(stock available\), picked and packed/);
 
-  await assert.rejects(stock.validateOperation(delivery._id), (err) => {
+  // Transfers validate directly, so the shortage itself is reported (and it is parked as waiting)
+  const transfer = await stock.createOperation({
+    type: 'internal', sourceLocation: mainStore._id, destLocation: productionRack._id,
+    lines: [{ product: steel._id, quantity: 20 }],
+  });
+  await assert.rejects(stock.validateOperation(transfer._id), (err) => {
     assert.equal(err.statusCode, 409);
     assert.match(err.message, /Not enough stock in WH\/Main Store: Steel \(need 20, have 5\)/);
     return true;
   });
+  assert.equal((await Operation.findById(transfer._id)).status, 'waiting');
+
   assert.equal(await onHand(steel, mainStore), 5);
-  assert.equal(await StockMove.countDocuments({ operation: delivery._id }), 0);
+  assert.equal(await StockMove.countDocuments({ operation: { $in: [delivery._id, transfer._id] } }), 0);
+});
+
+test('deliveries: pick before pack, validate only once packed', async () => {
+  await done({ type: 'receipt', destLocation: mainStore._id, lines: [{ product: rods._id, quantity: 10 }] });
+  const delivery = await stock.createOperation({ type: 'delivery', sourceLocation: mainStore._id, lines: [{ product: rods._id, quantity: 4 }] });
+
+  await assert.rejects(stock.validateOperation(delivery._id), /must be ready/); // still a draft
+  await stock.confirmOperation(delivery._id);
+  await assert.rejects(stock.validateOperation(delivery._id), /Pick and pack WH\/OUT\/0001 before validating/);
+  await assert.rejects(stock.markDeliveryStep(delivery._id, 'pack'), /Pick the items/);
+  await stock.markDeliveryStep(delivery._id, 'pick');
+  await assert.rejects(stock.validateOperation(delivery._id), /Pick and pack/);
+  await stock.markDeliveryStep(delivery._id, 'pack');
+  assert.equal((await stock.validateOperation(delivery._id)).status, 'done');
+  assert.equal(await onHand(rods, mainStore), 6);
+
+  // Back to draft clears pick/pack progress
+  const second = await stock.createOperation({ type: 'delivery', sourceLocation: mainStore._id, lines: [{ product: rods._id, quantity: 1 }] });
+  await pickAndPack(second._id);
+  const reset = await stock.resetToDraft(second._id);
+  assert.equal(reset.status, 'draft');
+  assert.equal(reset.pickedAt, null);
+  assert.equal(reset.packedAt, null);
+});
+
+test('a packed delivery whose stock was taken meanwhile is refused and parked as waiting', async () => {
+  await done({ type: 'receipt', destLocation: mainStore._id, lines: [{ product: rods._id, quantity: 10 }] });
+  const delivery = await stock.createOperation({ type: 'delivery', sourceLocation: mainStore._id, lines: [{ product: rods._id, quantity: 10 }] });
+  await pickAndPack(delivery._id);
+
+  // Someone moves the stock away before the delivery is validated
+  await done({ type: 'internal', sourceLocation: mainStore._id, destLocation: productionRack._id, lines: [{ product: rods._id, quantity: 7 }] });
+
+  await assert.rejects(stock.validateOperation(delivery._id), /Not enough stock in WH\/Main Store: Steel Rods \(need 10, have 3\)/);
   assert.equal((await Operation.findById(delivery._id)).status, 'waiting');
+  assert.equal(await onHand(rods, mainStore), 3);
+});
+
+test('duplicate copies moves as a new draft but never adjustments', async () => {
+  const receipt = await done({ type: 'receipt', partner: 'Tata Steel', destLocation: mainStore._id, lines: [{ product: steel._id, quantity: 3 }] });
+  const copy = await stock.duplicateOperation(receipt._id);
+  assert.equal(copy.status, 'draft');
+  assert.equal(copy.reference, 'WH/IN/0002');
+  assert.equal(copy.partner, 'Tata Steel');
+  assert.deepEqual(copy.lines.map((l) => l.quantity), [3]);
+  assert.match(copy.notes, /Copy of WH\/IN\/0001/);
+
+  const count = await done({ type: 'adjustment', location: mainStore._id, lines: [{ product: steel._id, quantity: 1 }] });
+  await assert.rejects(stock.duplicateOperation(count._id), /cannot be duplicated/);
 });
 
 test('waiting delivery becomes ready once a receipt brings enough stock', async () => {
@@ -146,6 +213,8 @@ test('waiting delivery becomes ready once a receipt brings enough stock', async 
   await done({ type: 'receipt', destLocation: mainStore._id, lines: [{ product: rods._id, quantity: 50 }] });
   assert.equal((await Operation.findById(delivery._id)).status, 'ready');
 
+  await stock.markDeliveryStep(delivery._id, 'pick');
+  await stock.markDeliveryStep(delivery._id, 'pack');
   await stock.validateOperation(delivery._id);
   assert.equal(await onHand(rods, mainStore), 40);
 });
