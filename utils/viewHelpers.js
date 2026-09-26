@@ -26,11 +26,11 @@ const OPERATION_META = {
     description: 'Stock moved between locations',
   },
   adjustment: {
-    label: 'Inventory Adjustment',
-    plural: 'Inventory Adjustments',
+    label: 'Stock Count',
+    plural: 'Stock Counts',
     slug: 'adjustments',
     partnerLabel: 'Counted by',
-    description: 'Physical count corrections',
+    description: 'Physical counts - differences are applied by an Inventory Manager',
   },
 };
 
@@ -51,6 +51,53 @@ const STOCK_STATUS_META = {
 };
 
 const OPEN_STATUSES = ['draft', 'waiting', 'ready'];
+
+// Why a stock count differs
+const REASON_META = {
+  count: 'Count correction',
+  damaged: 'Damaged',
+  lost: 'Lost / missing',
+  found: 'Found',
+  expired: 'Expired',
+};
+
+// Forecast outlook (services/insightsService.js)
+const OUTLOOK_META = {
+  out: { label: 'Out of stock', classes: 'bg-red-500/10 text-red-400 border-red-500/30' },
+  critical: { label: 'Order now', classes: 'bg-red-500/10 text-red-300 border-red-500/30' },
+  soon: { label: 'Runs out soon', classes: 'bg-amber-500/10 text-amber-400 border-amber-500/30' },
+  low: { label: 'Low stock', classes: 'bg-amber-500/10 text-amber-400 border-amber-500/30' },
+  ok: { label: 'Healthy', classes: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' },
+};
+
+// ₹ amounts (whole rupees above 1,000)
+const fmtMoney = (value) => {
+  const n = Number(value) || 0;
+  return n.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: Math.abs(n) >= 1000 ? 0 : 2 });
+};
+
+// "in 5 days", "today", "3 days ago"
+const fmtRelativeDays = (value) => {
+  if (!value) return '—';
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const d = new Date(value);
+  d.setHours(0, 0, 0, 0);
+  const diff = Math.round((d - start) / 86400000);
+  if (diff === 0) return 'today';
+  if (diff === 1) return 'tomorrow';
+  if (diff === -1) return 'yesterday';
+  return diff > 0 ? `in ${diff} days` : `${-diff} days ago`;
+};
+
+// "5 min ago" for the activity feed
+const fmtAgo = (value) => {
+  const seconds = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 1000));
+  if (seconds < 60) return 'just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)} h ago`;
+  return `${Math.floor(seconds / 86400)} d ago`;
+};
 
 const fmtQty = (value) => {
   const n = Number(value) || 0;
@@ -142,6 +189,12 @@ const ICONS = {
   check: 'M4.5 12.75l6 6 9-13.5',
   archive: 'M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z',
   menu: 'M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5',
+  bell: 'M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0',
+  scan: 'M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z M6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75zM13.5 19.5h.75v.75h-.75v-.75zM19.5 13.5h.75v.75h-.75v-.75zM19.5 19.5h.75v.75h-.75v-.75zM16.5 16.5h.75v.75h-.75v-.75z',
+  timemachine: 'M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z',
+  replenish: 'M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99',
+  label: 'M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z',
+  download: 'M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3',
 };
 
 // Inline SVG for a named icon (static markup only - safe for <%- %>)
@@ -169,6 +222,11 @@ module.exports = {
   STATUS_META,
   STOCK_STATUS_META,
   OPEN_STATUSES,
+  REASON_META,
+  OUTLOOK_META,
+  fmtMoney,
+  fmtRelativeDays,
+  fmtAgo,
   fmtQty,
   fmtDate,
   fmtDateTime,

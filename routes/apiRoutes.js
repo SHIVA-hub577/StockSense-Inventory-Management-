@@ -11,6 +11,9 @@ const { protect, authorize } = require('../middleware/authMiddleware');
 const products = require('../controllers/productController');
 const categories = require('../controllers/categoryController');
 const operations = require('../controllers/operationController');
+const insight = require('../controllers/insightController');
+const warehouses = require('../controllers/warehouseController');
+const live = require('../controllers/liveController');
 
 const manager = authorize('manager');
 
@@ -58,8 +61,32 @@ router.post('/operations/:id/reset', operations.apiReset);
 router.post('/operations/:id/duplicate', operations.apiDuplicate);
 router.post('/operations/:id/pick', operations.apiDeliveryStep('pick'));
 router.post('/operations/:id/pack', operations.apiDeliveryStep('pack'));
+router.post('/operations/:id/scan', operations.apiScan);
 
 // Stock
 router.get('/stock/available', operations.apiAvailable);
+router.get('/stock/at-location', operations.apiStockAtLocation);
+
+// Insights: dashboard, product timeline, replenishment
+router.get('/dashboard', insight.apiDashboard);
+router.get('/products/:id/timeline', insight.apiTimeline);
+router.get('/replenishment', insight.apiReplenishmentPlan);
+router.post('/replenishment', insight.apiCreateReplenishment);
+
+// Warehouses & locations
+router.get('/warehouses', warehouses.apiList);
+router.post('/warehouses', manager, warehouses.apiCreateWarehouse);
+router.patch('/warehouses/:id', manager, warehouses.apiUpdateWarehouse);
+router.post('/locations', manager, warehouses.apiCreateLocation);
+router.patch('/locations/:id', manager, warehouses.apiRenameLocation);
+router.post('/locations/:id/archive', manager, warehouses.apiLocationActive(false));
+router.post('/locations/:id/restore', manager, warehouses.apiLocationActive(true));
+
+// Live Warehouse, alerts, scanning
+router.get('/live', live.stream);
+router.get('/nav-counts', live.navCounts);
+router.get('/alerts', live.alerts);
+router.post('/alerts/read-all', live.alertsReadAll);
+router.get('/scan/resolve', live.resolve);
 
 module.exports = router;

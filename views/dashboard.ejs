@@ -1,162 +1,234 @@
 <%- include('layout/app-top') %>
+<%
+  const f = filters;
+  const q = (extra) => buildQuery({ warehouse: f.warehouse }, extra);
+  const typeOptions = [['', 'All documents'], ['receipt', 'Receipts'], ['delivery', 'Delivery orders'], ['internal', 'Internal transfers'], ['adjustment', 'Stock counts']];
+  const statusOptions = [['', 'Pending (open)'], ['draft', 'Draft'], ['waiting', 'Waiting'], ['ready', 'Ready'], ['done', 'Done'], ['canceled', 'Canceled']];
+  const opsLabel = ops.statusLabel === 'pending' ? 'pending' : STATUS_META[ops.statusLabel].label.toLowerCase();
+  const kpis = [
+    { label: 'Products in stock', value: stock.inStock, sub: `of ${stock.products} · ${fmtMoney(stock.value)}`, href: '/products?status=instock', icon: 'products', tone: 'text-white' },
+    { label: 'Low stock', value: stock.low, sub: 'at or below reorder level', href: '/products?status=low', icon: 'warning', tone: stock.low ? 'text-amber-400' : 'text-white' },
+    { label: 'Out of stock', value: stock.out, sub: 'nothing on hand', href: '/products?status=out', icon: 'warning', tone: stock.out ? 'text-red-400' : 'text-white' },
+    { label: 'Receipts', value: ops.receipts, sub: opsLabel, href: '/receipts' + q({ tab: f.status || 'todo' }), icon: 'receipts', tone: 'text-white', type: 'receipt' },
+    { label: 'Deliveries', value: ops.deliveries, sub: opsLabel, href: '/deliveries' + q({ tab: f.status || 'todo' }), icon: 'deliveries', tone: 'text-white', type: 'delivery' },
+    { label: 'Transfers scheduled', value: ops.transfers, sub: opsLabel, href: '/transfers' + q({ tab: f.status || 'todo' }), icon: 'transfers', tone: 'text-white', type: 'internal' },
+  ];
+  const columns = [
+    { key: 'toReceive', label: 'To receive', tone: 'text-blue-300' },
+    { key: 'toPick', label: 'To pick', tone: 'text-blue-300' },
+    { key: 'toPack', label: 'To pack', tone: 'text-blue-300' },
+    { key: 'readyToShip', label: 'Ready to ship', tone: 'text-emerald-400' },
+    { key: 'late', label: 'Late', tone: 'text-red-400' },
+  ];
+%>
 
-<div class="space-y-8">
-    
-    <!-- Welcome Banner -->
-    <div class="glass-card rounded-2xl p-6 sm:p-8 border border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900/90 to-blue-950/40 relative overflow-hidden">
-      <div class="relative z-10 max-w-2xl space-y-3">
-        <div class="inline-block px-3 py-1 rounded-lg text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">
-          Role-Based Access Control Active
-        </div>
-        <h1 class="text-3xl font-extrabold text-white tracking-tight">
-          Welcome back, <%= user.name %> 👋
-        </h1>
-        <p class="text-sm text-slate-300 leading-relaxed">
-          <% if (user.role === 'manager') { %>
-            You have <strong>Inventory Manager</strong> privileges. You can manage products, categories, warehouse locations, validate stock adjustments, and view system reports.
-          <% } else { %>
-            You have <strong>Warehouse Staff</strong> permissions. You are assigned to physical stock receiving, order picking & packing, internal inventory transfers, and stock counts.
-          <% } %>
-        </p>
-      </div>
-    </div>
-
-    <!-- Role Permission Overview Cards -->
-    <div class="space-y-4">
-      <h2 class="text-lg font-bold text-white flex items-center">
-        <svg class="w-5 h-5 mr-2 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-        </svg>
-        Role Capabilities & Operations
-      </h2>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-
-        <!-- 1. Catalog & Product Management -->
-        <div class="glass-card rounded-2xl p-6 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-all">
-          <div class="space-y-3">
-            <div class="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center font-bold">
-              📦
-            </div>
-            <h3 class="text-base font-bold text-white">Catalog & Products</h3>
-            <p class="text-xs text-slate-400">Create & edit products, set reorder levels, manage categories.</p>
-          </div>
-          <div class="mt-4 pt-4 border-t border-slate-800/80 flex items-center justify-between">
-            <span class="text-xs font-semibold text-slate-400">Permission:</span>
-            <% if (user.role === 'manager') { %>
-              <span class="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-md border border-emerald-500/20">Allowed (Manager)</span>
-            <% } else { %>
-              <span class="text-xs font-bold text-slate-500 bg-slate-800 px-2.5 py-1 rounded-md">View Only</span>
-            <% } %>
-          </div>
-        </div>
-
-        <!-- 2. Physical Receiving & Goods Inward -->
-        <div class="glass-card rounded-2xl p-6 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-all">
-          <div class="space-y-3">
-            <div class="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center font-bold">
-              🚚
-            </div>
-            <h3 class="text-base font-bold text-white">Receiving Goods</h3>
-            <p class="text-xs text-slate-400">Receive shipments, inspect quality, record incoming stock quantities.</p>
-          </div>
-          <div class="mt-4 pt-4 border-t border-slate-800/80 flex items-center justify-between">
-            <span class="text-xs font-semibold text-slate-400">Permission:</span>
-            <span class="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-md border border-emerald-500/20">Allowed (Staff & Manager)</span>
-          </div>
-        </div>
-
-        <!-- 3. Picking & Packing Delivery Orders -->
-        <div class="glass-card rounded-2xl p-6 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-all">
-          <div class="space-y-3">
-            <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center font-bold">
-              📋
-            </div>
-            <h3 class="text-base font-bold text-white">Picking & Packing</h3>
-            <p class="text-xs text-slate-400">Process delivery orders, pick stock from bins, pack shipments.</p>
-          </div>
-          <div class="mt-4 pt-4 border-t border-slate-800/80 flex items-center justify-between">
-            <span class="text-xs font-semibold text-slate-400">Permission:</span>
-            <span class="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-md border border-emerald-500/20">Allowed (Staff & Manager)</span>
-          </div>
-        </div>
-
-        <!-- 4. Internal Transfers -->
-        <div class="glass-card rounded-2xl p-6 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-all">
-          <div class="space-y-3">
-            <div class="w-10 h-10 rounded-xl bg-teal-500/10 text-teal-400 flex items-center justify-center font-bold">
-              🔄
-            </div>
-            <h3 class="text-base font-bold text-white">Internal Transfers</h3>
-            <p class="text-xs text-slate-400">Move inventory between racks, zones, or warehouse facilities.</p>
-          </div>
-          <div class="mt-4 pt-4 border-t border-slate-800/80 flex items-center justify-between">
-            <span class="text-xs font-semibold text-slate-400">Permission:</span>
-            <span class="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-md border border-emerald-500/20">Allowed (Staff & Manager)</span>
-          </div>
-        </div>
-
-        <!-- 5. Physical Stock Counting & Adjustments -->
-        <div class="glass-card rounded-2xl p-6 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-all">
-          <div class="space-y-3">
-            <div class="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center font-bold">
-              📊
-            </div>
-            <h3 class="text-base font-bold text-white">Stock Counting & Validation</h3>
-            <p class="text-xs text-slate-400">Staff perform counts; Managers approve & validate adjustments.</p>
-          </div>
-          <div class="mt-4 pt-4 border-t border-slate-800/80 flex items-center justify-between">
-            <span class="text-xs font-semibold text-slate-400">Permission:</span>
-            <% if (user.role === 'manager') { %>
-              <span class="text-xs font-bold text-purple-400 bg-purple-500/10 px-2.5 py-1 rounded-md border border-purple-500/20">Full Approval</span>
-            <% } else { %>
-              <span class="text-xs font-bold text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-md border border-amber-500/20">Physical Count Only</span>
-            <% } %>
-          </div>
-        </div>
-
-        <!-- 6. Warehouse Settings & User Admin -->
-        <div class="glass-card rounded-2xl p-6 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-all">
-          <div class="space-y-3">
-            <div class="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-400 flex items-center justify-center font-bold">
-              ⚙️
-            </div>
-            <h3 class="text-base font-bold text-white">Warehouse Settings</h3>
-            <p class="text-xs text-slate-400">Configure warehouses, locations, and manage team members.</p>
-          </div>
-          <div class="mt-4 pt-4 border-t border-slate-800/80 flex items-center justify-between">
-            <span class="text-xs font-semibold text-slate-400">Permission:</span>
-            <% if (user.role === 'manager') { %>
-              <span class="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-md border border-emerald-500/20">Allowed (Manager)</span>
-            <% } else { %>
-              <span class="text-xs font-bold text-red-400 bg-red-500/10 px-2.5 py-1 rounded-md border border-red-500/20">Restricted (Staff)</span>
-            <% } %>
-          </div>
-        </div>
-
-      </div>
-    </div>
-
-    <!-- Test Role Permission Link -->
-    <div class="glass-card rounded-2xl p-6 border border-slate-800 space-y-3">
-      <h3 class="text-sm font-bold text-white">🧪 Test Route-Level Permission Enforcement</h3>
-      <p class="text-xs text-slate-400">Click below to test server-side role validation middleware (<code class="text-blue-400">authorize('manager')</code>):</p>
-      <div class="flex flex-wrap gap-3">
-        <a 
-          href="/manager/catalog" 
-          class="px-4 py-2 rounded-xl text-xs font-semibold bg-purple-600/20 text-purple-300 border border-purple-500/30 hover:bg-purple-600/30 transition-all"
-        >
-          Try Manager-Only Route (/manager/catalog)
-        </a>
-        <a 
-          href="/staff/receiving" 
-          class="px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600/20 text-blue-300 border border-blue-500/30 hover:bg-blue-600/30 transition-all"
-        >
-          Try Shared Operations Route (/staff/receiving)
-        </a>
-      </div>
-    </div>
-
+<div class="flex flex-col xl:flex-row xl:items-end justify-between gap-4">
+  <div>
+    <h1 class="text-2xl font-bold text-white tracking-tight">Inventory overview</h1>
+    <p class="text-sm text-slate-400 mt-1"><%= fmtDate(new Date()) %> · <%= user.role === 'manager' ? 'Inventory Manager' : 'Warehouse Staff' %> view<% if (ops.late) { %> · <a href="/dashboard#board" class="text-red-400 hover:text-red-300"><%= ops.late %> late</a><% } %></p>
+  </div>
+  <!-- Dynamic filters -->
+  <form method="GET" action="/dashboard" id="dashFilters" class="grid grid-cols-2 lg:grid-cols-4 gap-2" aria-label="Dashboard filters">
+    <select name="type" class="input py-2" aria-label="Document type">
+      <% typeOptions.forEach(([v, l]) => { %><option value="<%= v %>" <%= f.type === v ? 'selected' : '' %>><%= l %></option><% }) %>
+    </select>
+    <select name="status" class="input py-2" aria-label="Status">
+      <% statusOptions.forEach(([v, l]) => { %><option value="<%= v %>" <%= f.status === v ? 'selected' : '' %>><%= l %></option><% }) %>
+    </select>
+    <select name="warehouse" class="input py-2" aria-label="Warehouse">
+      <option value="">All warehouses</option>
+      <% warehouses.forEach((w) => { %><option value="<%= w._id %>" <%= String(w._id) === f.warehouse ? 'selected' : '' %>><%= w.name %></option><% }) %>
+    </select>
+    <select name="category" class="input py-2" aria-label="Product category">
+      <option value="">All categories</option>
+      <% categories.forEach((c) => { %><option value="<%= c._id %>" <%= String(c._id) === f.category ? 'selected' : '' %>><%= c.name %></option><% }) %>
+    </select>
+  </form>
 </div>
+
+<!-- KPIs -->
+<section data-live-region="kpis" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 rounded-2xl transition-shadow" aria-label="Key figures">
+  <% kpis.forEach((k) => { const dim = f.type && k.type && k.type !== f.type; %>
+    <a href="<%= k.href %>" class="card p-4 hover:border-slate-600 transition-colors <%= dim ? 'opacity-40' : '' %>">
+      <div class="flex items-center justify-between text-slate-400">
+        <p class="text-xs font-semibold uppercase tracking-wider"><%= k.label %></p>
+        <%- icon(k.icon, 'w-4 h-4') %>
+      </div>
+      <p class="mt-3 text-3xl font-bold tabular-nums <%= k.tone %>"><%= k.value %></p>
+      <p class="text-xs text-slate-500 mt-1 truncate"><%= k.sub %></p>
+    </a>
+  <% }) %>
+</section>
+
+<!-- Today board -->
+<section id="board" class="space-y-3">
+  <div class="flex items-center justify-between">
+    <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Today's work</h2>
+    <a href="/scan" class="text-xs text-blue-400 hover:text-blue-300">Open scanner →</a>
+  </div>
+  <div data-live-region="board" class="grid sm:grid-cols-2 xl:grid-cols-5 gap-4 rounded-2xl transition-shadow">
+    <% columns.forEach((col) => { const c = board[col.key]; %>
+      <div class="card p-4 space-y-3 min-h-[9rem]">
+        <div class="flex items-center justify-between">
+          <p class="text-sm font-semibold <%= col.tone %>"><%= col.label %></p>
+          <span class="text-xs font-bold rounded-full px-2 py-0.5 <%= c.count ? (col.key === 'late' ? 'bg-red-500/15 text-red-300' : 'bg-slate-800 text-slate-200') : 'bg-slate-800/50 text-slate-500' %>"><%= c.count %></span>
+        </div>
+        <% if (c.items.length === 0) { %>
+          <p class="text-xs text-slate-500"><%= col.key === 'late' ? 'Nothing late' : 'All clear' %></p>
+        <% } else { %>
+          <ul class="space-y-2">
+            <% c.items.forEach((op) => { %>
+              <li>
+                <a href="/operations/<%= op._id %>" class="block rounded-lg px-2 py-1.5 -mx-2 hover:bg-slate-800/60">
+                  <span class="font-mono text-xs text-blue-300"><%= op.reference %></span>
+                  <span class="block text-xs text-slate-400 truncate"><%= op.partner || OPERATION_META[op.type].label %> · <%= fmtRelativeDays(op.scheduledDate) %></span>
+                </a>
+              </li>
+            <% }) %>
+          </ul>
+          <% if (c.count > c.items.length) { %><p class="text-xs text-slate-500">+<%= c.count - c.items.length %> more</p><% } %>
+        <% } %>
+      </div>
+    <% }) %>
+  </div>
+</section>
+
+<div class="grid xl:grid-cols-3 gap-6">
+  <!-- Flow chart -->
+  <section class="card p-5 xl:col-span-2 space-y-4">
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="text-sm font-semibold text-white">Stock flow · last 14 days</h2>
+        <p class="text-xs text-slate-500">Value of goods coming in vs going out</p>
+      </div>
+      <a href="/moves" class="text-xs text-blue-400 hover:text-blue-300">Move history →</a>
+    </div>
+    <div class="h-64"><canvas id="flowChart" aria-label="Stock value in and out per day" role="img"></canvas></div>
+    <div data-live-region="flowdata" hidden><script type="application/json" id="flowData"><%- jsonForScript(chart) %></script></div>
+  </section>
+
+  <!-- Forecast warnings -->
+  <section class="card overflow-hidden">
+    <div class="flex items-center justify-between px-4 py-3 border-b border-slate-800">
+      <h2 class="text-sm font-semibold text-white">Stock outlook</h2>
+      <a href="/replenishment" class="text-xs text-blue-400 hover:text-blue-300">Replenish →</a>
+    </div>
+    <ul data-live-region="warnings" class="divide-y divide-slate-800 transition-shadow">
+      <% if (warnings.length === 0) { %>
+        <li class="px-4 py-8 text-center text-sm text-slate-400">Everything is healthy for the next 30 days</li>
+      <% } %>
+      <% warnings.forEach(({ product, forecast }) => { const o = OUTLOOK_META[forecast.status]; %>
+        <li class="px-4 py-3 flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <a href="/products/<%= product._id %>" class="block text-sm font-medium text-white hover:text-blue-300 truncate"><%= product.name %></a>
+            <p class="text-xs text-slate-400">
+              <%= fmtQty(forecast.onHand) %> <%= product.uom %> left
+              <% if (forecast.stockoutDate && forecast.status !== 'out') { %>· runs out <%= fmtRelativeDays(forecast.stockoutDate) %><% } %>
+              <% if (forecast.orderByDate) { %>· order <%= new Date(forecast.orderByDate) <= new Date() ? 'now' : 'by ' + fmtDate(forecast.orderByDate) %><% } %>
+            </p>
+          </div>
+          <span class="badge <%= o.classes %>"><%= o.label %></span>
+        </li>
+      <% }) %>
+    </ul>
+  </section>
+</div>
+
+<div class="grid xl:grid-cols-3 gap-6">
+  <!-- Operations (all four filters) -->
+  <section class="card overflow-hidden xl:col-span-2">
+    <div class="flex items-center justify-between px-4 py-3 border-b border-slate-800">
+      <h2 class="text-sm font-semibold text-white">Operations <span class="font-normal text-slate-500">· most recently updated</span></h2>
+    </div>
+    <div data-live-region="operations" class="overflow-x-auto transition-shadow">
+      <% if (operations.length === 0) { %>
+        <p class="px-4 py-8 text-center text-sm text-slate-400">No operations match these filters</p>
+      <% } else { %>
+        <table class="min-w-full">
+          <thead class="bg-slate-900/80"><tr><th class="th">Reference</th><th class="th">Type</th><th class="th">Partner / route</th><th class="th">Scheduled</th><th class="th">Status</th></tr></thead>
+          <tbody>
+            <% operations.forEach((op) => { %>
+              <tr class="border-t border-slate-800 hover:bg-slate-800/30">
+                <td class="td"><a href="/operations/<%= op._id %>" class="font-mono text-blue-300 hover:text-blue-200"><%= op.reference %></a></td>
+                <td class="td text-slate-400"><%= OPERATION_META[op.type].label %></td>
+                <td class="td text-slate-300 truncate max-w-[16rem]"><%= op.type === 'adjustment' ? `Count · ${op.sourceLocation.fullName}` : op.partner || `${op.sourceLocation.fullName} → ${op.destLocation.fullName}` %></td>
+                <td class="td whitespace-nowrap <%= isLate(op) ? 'text-red-400' : 'text-slate-400' %>"><%= fmtDate(op.scheduledDate) %></td>
+                <td class="td"><span class="badge <%= STATUS_META[op.status].classes %>"><%= STATUS_META[op.status].label %></span></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      <% } %>
+    </div>
+  </section>
+
+  <!-- Live activity -->
+  <section class="card overflow-hidden">
+    <div class="flex items-center justify-between px-4 py-3 border-b border-slate-800">
+      <h2 class="text-sm font-semibold text-white">Live activity</h2>
+      <span class="flex items-center gap-1.5 text-xs text-emerald-400"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>live</span>
+    </div>
+    <ul id="activityFeed" class="divide-y divide-slate-800 max-h-[26rem] overflow-y-auto">
+      <% if (feed.length === 0) { %>
+        <li id="activityEmpty" class="px-4 py-8 text-center text-sm text-slate-400">Nothing yet - actions by anyone appear here instantly</li>
+      <% } %>
+      <% feed.forEach((a) => { %>
+        <li class="px-4 py-3 flex gap-3">
+          <span class="mt-1.5 w-2 h-2 shrink-0 rounded-full <%= a.action === 'validated' ? 'bg-emerald-400' : a.action === 'canceled' ? 'bg-red-400' : 'bg-slate-500' %>"></span>
+          <div class="min-w-0">
+            <a href="/operations/<%= a.subject %>" class="block text-sm text-slate-200 hover:text-white"><%= a.message %></a>
+            <p class="text-xs text-slate-500"><%= fmtAgo(a.createdAt) %></p>
+          </div>
+        </li>
+      <% }) %>
+    </ul>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+  (() => {
+    // Filters apply as soon as they change
+    const form = document.getElementById('dashFilters');
+    form.addEventListener('change', () => {
+      const params = new URLSearchParams(new FormData(form));
+      [...params.keys()].forEach((k) => { if (!params.get(k)) params.delete(k); });
+      window.location.search = params.toString();
+    });
+
+    let chart;
+    const money = (v) => Number(v).toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
+    function drawChart() {
+      if (!window.Chart) return;
+      const data = JSON.parse(document.getElementById('flowData').textContent);
+      const labels = data.map((d) => new Date(d.day + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }));
+      if (chart) chart.destroy();
+      chart = new Chart(document.getElementById('flowChart'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            { label: 'In', data: data.map((d) => d.in), backgroundColor: 'rgba(52, 211, 153, 0.75)', borderRadius: 4 },
+            { label: 'Out', data: data.map((d) => d.out), backgroundColor: 'rgba(248, 113, 113, 0.75)', borderRadius: 4 },
+          ],
+        },
+        options: {
+          maintainAspectRatio: false,
+          animation: { duration: 300 },
+          plugins: {
+            legend: { labels: { color: '#94a3b8', boxWidth: 12 } },
+            tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${money(c.parsed.y)}` } },
+          },
+          scales: {
+            x: { ticks: { color: '#64748b' }, grid: { display: false } },
+            y: { ticks: { color: '#64748b', callback: (v) => money(v) }, grid: { color: 'rgba(148, 163, 184, 0.1)' } },
+          },
+        },
+      });
+    }
+    drawChart();
+    document.addEventListener('stocksense:regions-updated', drawChart);
+  })();
+</script>
 
 <%- include('layout/app-bottom') %>

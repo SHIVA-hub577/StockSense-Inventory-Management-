@@ -7,10 +7,9 @@ const {
   getForgotPasswordPage,
   getVerifyOtpPage,
   getResetPasswordPage,
-  getDashboardPage,
   getProfilePage,
 } = require('../controllers/viewController');
-const { protect, authorize } = require('../middleware/authMiddleware');
+const { protect } = require('../middleware/authMiddleware');
 const appLocals = require('../middleware/appLocals');
 
 // Public Web View Routes
@@ -21,25 +20,7 @@ router.get('/auth/forgot-password', getForgotPasswordPage);
 router.get('/auth/verify-otp', getVerifyOtpPage);
 router.get('/auth/reset-password', getResetPasswordPage);
 
-// Dashboard Route (Protected - Shared by Manager & Staff)
-router.get('/dashboard', protect, appLocals, getDashboardPage);
+// Profile (the dashboard lives in inventoryRoutes)
 router.get('/profile', protect, appLocals, getProfilePage);
-
-// Sample Role-Gated Routes to demonstrate permission checks
-router.get('/manager/catalog', protect, authorize('manager'), appLocals, (req, res) => {
-  res.render('dashboard', {
-    title: 'Catalog Management (Manager Only)',
-    user: req.user,
-    activeSection: 'catalog',
-  });
-});
-
-router.get('/staff/receiving', protect, authorize('staff', 'manager'), appLocals, (req, res) => {
-  res.render('dashboard', {
-    title: 'Goods Receiving (Staff & Manager)',
-    user: req.user,
-    activeSection: 'receiving',
-  });
-});
 
 module.exports = router;

@@ -48,13 +48,6 @@ const getResetPasswordPage = (req, res) => {
   });
 };
 
-const getDashboardPage = (req, res) => {
-  res.render('dashboard', {
-    title: 'Dashboard - StockSense',
-    user: req.user,
-  });
-};
-
 const getProfilePage = async (req, res) => {
   const mine = { $or: [{ createdBy: req.user._id }, { validatedBy: req.user._id }] };
   const [created, validated, recent] = await Promise.all([
@@ -77,6 +70,5 @@ module.exports = {
   getForgotPasswordPage,
   getVerifyOtpPage,
   getResetPasswordPage,
-  getDashboardPage,
   getProfilePage,
 };

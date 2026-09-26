@@ -441,7 +441,7 @@ test('product with initial stock is all-or-nothing', async () => {
   assert.equal(retry.status, 201);
 });
 
-test('adjustments: not duplicated, not edited with the move form', async () => {
+test('stock counts: never duplicated, edited with their own count sheet', async () => {
   const p = await newProduct({ initialQty: 3, initialLocation: String(stockLoc._id) });
   const initial = await Operation.findOne({ type: 'adjustment' }).lean();
   const dup = await call('POST', `/api/operations/${initial._id}/duplicate`);
@@ -452,10 +452,12 @@ test('adjustments: not duplicated, not edited with the move form', async () => {
     body: { type: 'adjustment', location: String(stockLoc._id), lines: [{ product: p._id, quantity: 2 }] },
   });
   const edit = await call('GET', `/operations/${body.data.operation._id}/edit`, { headers: { Accept: 'text/html' } });
-  assert.equal(edit.status, 302);
+  assert.equal(edit.status, 200);
+  assert.match(edit.text, /countFormData/); // the count sheet, not the move form
+  assert.ok(!edit.text.includes('operationFormData'));
   const page = await call('GET', `/operations/${body.data.operation._id}`, { headers: { Accept: 'text/html' } });
   assert.equal(page.status, 200);
-  assert.ok(!page.text.includes('href="/adjustments"'));
+  assert.ok(page.text.includes('href="/adjustments"'));
   assert.ok(!page.text.includes('data-op-action="duplicate"'));
 });
 

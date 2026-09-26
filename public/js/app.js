@@ -116,6 +116,7 @@
       overlay.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4';
       overlay.setAttribute('role', 'dialog');
       overlay.setAttribute('aria-modal', 'true');
+      overlay.dataset.confirmDialog = '';
 
       const box = document.createElement('div');
       box.className = 'w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl space-y-4';

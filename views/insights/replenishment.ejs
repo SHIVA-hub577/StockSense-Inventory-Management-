@@ -1,0 +1,145 @@
+<%- include('../layout/app-top') %>
+<%
+  const totalItems = groups.reduce((n, g) => n + g.items.length, 0);
+  const totalValue = groups.reduce((n, g) => n + g.value, 0);
+%>
+
+<div class="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+  <div>
+    <h1 class="text-2xl font-bold text-white tracking-tight flex items-center gap-2"><%- icon('replenish', 'w-6 h-6 text-blue-400') %> Replenishment</h1>
+    <p class="text-sm text-slate-400 mt-1">Products that will run out or are below their reorder level, grouped by supplier. Adjust quantities, then create the receipts in one click.</p>
+  </div>
+  <% if (totalItems) { %>
+    <button type="button" id="createAll" class="btn btn-primary"><span>Create receipts for selected (<span id="selectedCount"><%= totalItems %></span>)</span></button>
+  <% } %>
+</div>
+
+<details class="card p-4 text-sm text-slate-300">
+  <summary class="cursor-pointer font-semibold text-white">How suggestions are calculated</summary>
+  <ul class="mt-3 space-y-1.5 list-disc pl-5 text-slate-400">
+    <li><strong class="text-slate-200">Usage</strong> = units delivered to customers over the last <%= usageDays %> days ÷ <%= usageDays %>.</li>
+    <li><strong class="text-slate-200">Projected stock</strong> for each of the next <%= horizon %> days = on hand + confirmed receipts − the larger of (confirmed deliveries, usage × days).</li>
+    <li><strong class="text-slate-200">Runs out</strong> on the first day projected stock reaches zero. <strong class="text-slate-200">Order by</strong> = that day − the supplier's lead time.</li>
+    <li><strong class="text-slate-200">Suggested quantity</strong> brings stock back to reorder level + usage for lead time + <%= coverDays %> days (at least the product's reorder quantity). Stock already on its way is counted, so nothing is ordered twice.</li>
+  </ul>
+</details>
+
+<% if (groups.length === 0) { %>
+  <div class="card p-12 text-center space-y-2">
+    <div class="inline-flex w-12 h-12 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-400"><%- icon('check', 'w-6 h-6') %></div>
+    <p class="text-white font-semibold">Nothing to reorder</p>
+    <p class="text-sm text-slate-400">Every product has enough stock (or enough already incoming) for the next <%= horizon %> days.</p>
+  </div>
+<% } %>
+
+<div id="groups" class="space-y-6">
+  <% groups.forEach((g, gi) => { %>
+    <section class="card overflow-hidden" data-group>
+      <div class="flex flex-col lg:flex-row lg:items-end gap-3 justify-between px-4 py-4 border-b border-slate-800">
+        <div class="grid sm:grid-cols-2 gap-3 flex-1 max-w-2xl">
+          <div>
+            <label class="label" for="supplier-<%= gi %>">Supplier</label>
+            <input id="supplier-<%= gi %>" class="input" data-supplier value="<%= g.supplier %>" placeholder="Supplier to confirm" maxlength="200">
+          </div>
+          <div>
+            <label class="label" for="dest-<%= gi %>">Receive into</label>
+            <select id="dest-<%= gi %>" class="input" data-dest>
+              <% locations.forEach((l) => { %><option value="<%= l._id %>" <%= String(l._id) === g.destination ? 'selected' : '' %>><%= l.fullName %></option><% }) %>
+            </select>
+          </div>
+        </div>
+        <p class="text-sm text-slate-400">Order value <span class="font-semibold text-white" data-group-total><%= fmtMoney(g.value) %></span></p>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full">
+          <thead class="bg-slate-900/80">
+            <tr>
+              <th class="th w-10"><span class="sr-only">Order</span></th>
+              <th class="th">Product</th>
+              <th class="th">Outlook</th>
+              <th class="th text-right">On hand</th>
+              <th class="th text-right" title="Average units delivered per day">Usage / day</th>
+              <th class="th">Runs out</th>
+              <th class="th">Order by</th>
+              <th class="th w-32 text-right">Order qty</th>
+              <th class="th text-right">Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% g.items.forEach(({ product: p, forecast: f, suggestedQty }) => { const o = OUTLOOK_META[f.status]; const orderNow = f.orderByDate && new Date(f.orderByDate) <= new Date(); %>
+              <tr class="border-t border-slate-800" data-item data-product="<%= p._id %>" data-cost="<%= p.unitCost || 0 %>">
+                <td class="td"><input type="checkbox" checked class="accent-blue-500 w-4 h-4" data-pick aria-label="Order <%= p.name %>"></td>
+                <td class="td"><a href="/products/<%= p._id %>" class="font-medium text-white hover:text-blue-300"><%= p.name %></a><div class="text-xs font-mono text-slate-500"><%= p.sku %> · lead time <%= f.leadTime %>d</div></td>
+                <td class="td"><span class="badge <%= o.classes %>"><%= o.label %></span></td>
+                <td class="td text-right tabular-nums"><%= fmtQty(f.onHand) %> <span class="text-xs text-slate-500"><%= p.uom %></span><% if (f.incoming) { %><div class="text-[11px] text-emerald-400">+<%= fmtQty(f.incoming) %> incoming</div><% } %></td>
+                <td class="td text-right tabular-nums text-slate-300"><%= f.avgDaily ? (Math.round(f.avgDaily * 10) / 10).toLocaleString('en-IN') : '—' %></td>
+                <td class="td whitespace-nowrap <%= f.stockoutDay !== null && f.stockoutDay <= f.leadTime ? 'text-red-400' : 'text-slate-300' %>"><%= f.status === 'out' ? 'Now' : f.stockoutDate ? fmtRelativeDays(f.stockoutDate) : '—' %></td>
+                <td class="td whitespace-nowrap <%= orderNow ? 'text-red-400 font-semibold' : 'text-slate-300' %>"><%= f.orderByDate ? (orderNow ? 'Now' : fmtDate(f.orderByDate)) : '—' %></td>
+                <td class="td"><input type="number" min="0" step="any" value="<%= suggestedQty %>" class="input text-right tabular-nums py-1.5" data-qty aria-label="Quantity of <%= p.name %>"></td>
+                <td class="td text-right tabular-nums text-slate-300" data-line-total><%= fmtMoney(suggestedQty * (p.unitCost || 0)) %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  <% }) %>
+</div>
+
+<% if (totalItems) { %>
+<script>
+  (() => {
+    const { api, toast, toastAfterNavigation, setBusy } = window.StockSense;
+    const money = (v) => Number(v).toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
+
+    function recalc() {
+      let selected = 0;
+      document.querySelectorAll('[data-group]').forEach((group) => {
+        let total = 0;
+        group.querySelectorAll('[data-item]').forEach((row) => {
+          const on = row.querySelector('[data-pick]').checked;
+          const qty = Number(row.querySelector('[data-qty]').value) || 0;
+          const value = qty * Number(row.dataset.cost);
+          row.querySelector('[data-line-total]').textContent = money(value);
+          row.classList.toggle('opacity-40', !on);
+          if (on && qty > 0) {
+            total += value;
+            selected += 1;
+          }
+        });
+        group.querySelector('[data-group-total]').textContent = money(total);
+      });
+      document.getElementById('selectedCount').textContent = selected;
+      return selected;
+    }
+    document.getElementById('groups').addEventListener('input', recalc);
+    document.getElementById('groups').addEventListener('change', recalc);
+
+    const button = document.getElementById('createAll');
+    button.addEventListener('click', async () => {
+      const groups = [...document.querySelectorAll('[data-group]')]
+        .map((group) => ({
+          supplier: group.querySelector('[data-supplier]').value,
+          destLocation: group.querySelector('[data-dest]').value,
+          lines: [...group.querySelectorAll('[data-item]')]
+            .filter((row) => row.querySelector('[data-pick]').checked && Number(row.querySelector('[data-qty]').value) > 0)
+            .map((row) => ({ product: row.dataset.product, quantity: Number(row.querySelector('[data-qty]').value) })),
+        }))
+        .filter((g) => g.lines.length > 0);
+      if (groups.length === 0) return toast('Select at least one product with a quantity', 'error');
+
+      setBusy(button, true, 'Creating receipts...');
+      try {
+        const res = await api('POST', '/api/replenishment', { groups });
+        toastAfterNavigation(res.message);
+        window.location.href = '/receipts?tab=ready';
+      } catch (err) {
+        toast(err.message, 'error', 8000);
+        setBusy(button, false);
+      }
+    });
+  })();
+</script>
+<% } %>
+
+<%- include('../layout/app-bottom') %>

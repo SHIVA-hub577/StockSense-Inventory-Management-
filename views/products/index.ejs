@@ -7,7 +7,8 @@
     { key: 'attention', label: 'Needs attention', count: counts.attention, tone: 'amber' },
     { key: 'low', label: 'Low stock', count: counts.low },
     { key: 'out', label: 'Out of stock', count: counts.out },
-    { key: 'ok', label: 'In stock', count: counts.ok },
+    // (low-stock products are in stock too - same meaning as the dashboard's 'Products in stock')
+    { key: 'instock', label: 'In stock', count: counts.ok + counts.low },
   ];
   const hasFilters = filters.search || filters.category || filters.status;
 %>
@@ -113,7 +114,12 @@
                 <% } %>
               </td>
               <td class="td text-right tabular-nums text-slate-400"><%= fmtQty(p.reorderLevel) %></td>
-              <td class="td"><span class="badge <%= st.classes %>"><%= st.label %></span></td>
+              <td class="td">
+                <span class="badge <%= st.classes %>"><%= st.label %></span>
+                <% if (p.outlook && p.outlook.stockoutDate && p.outlook.status !== 'out') { %>
+                  <div class="text-[11px] mt-1 <%= p.outlook.status === 'critical' ? 'text-red-400' : 'text-amber-400' %>" title="Projected from usage and confirmed operations">runs out <%= fmtRelativeDays(p.outlook.stockoutDate) %></div>
+                <% } %>
+              </td>
               <td class="td text-right whitespace-nowrap">
                 <% if (!filters.archived && p.stockStatus !== 'ok') { %>
                   <a href="/receipts/new?product=<%= p._id %>&qty=<%= reorderSuggestion(p) %>" class="btn btn-secondary btn-sm" title="Create a receipt to replenish">Reorder</a>

@@ -2,7 +2,9 @@
 <%
   const isManager = user.role === 'manager';
   const st = STOCK_STATUS_META[stockStatus];
-  const suggestion = reorderSuggestion({ ...product, onHand });
+  const suggestion = outlook && outlook.suggestedQty > 0 ? outlook.suggestedQty : reorderSuggestion({ ...product, onHand });
+  const o = OUTLOOK_META[outlook.status];
+  const mainLocation = locations.length ? locations[0].location._id : '';
   // Direction of a ledger row from this product's point of view
   const moveDirection = (m) => {
     const fromInternal = m.fromLocation && m.fromLocation.type === 'internal';
@@ -34,7 +36,9 @@
     <% if (product.isActive) { %>
       <a href="/receipts/new?product=<%= product._id %>&qty=<%= suggestion %>" class="btn <%= stockStatus === 'ok' ? 'btn-secondary' : 'btn-primary' %>"><%- icon('receipts', 'w-4 h-4') %> Reorder</a>
       <a href="/deliveries/new?product=<%= product._id %>" class="btn btn-secondary"><%- icon('deliveries', 'w-4 h-4') %> Deliver</a>
+      <a href="/adjustments/new?product=<%= product._id %><%= mainLocation ? '&location=' + mainLocation : '' %>" class="btn btn-secondary"><%- icon('adjustments', 'w-4 h-4') %> Count</a>
     <% } %>
+    <a href="/labels?product=<%= product._id %>" target="_blank" rel="noopener" class="btn btn-secondary"><%- icon('printer', 'w-4 h-4') %> Label</a>
     <% if (isManager) { %>
       <a href="/products/<%= product._id %>/edit" class="btn btn-secondary"><%- icon('pencil', 'w-4 h-4') %> Edit</a>
       <% if (product.isActive) { %>
@@ -77,6 +81,26 @@
     <p class="text-sm text-slate-300">Order <strong class="text-white"><%= product.reorderQty ? fmtQty(product.reorderQty) : '—' %></strong> <%= product.reorderQty ? product.uom : '' %></p>
   </div>
 </div>
+
+<!-- Outlook: forecast from the ledger -->
+<section class="card p-5 space-y-4" aria-label="Stock outlook">
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <h2 class="text-sm font-semibold text-white flex items-center gap-2">Stock timeline <span class="badge <%= o.classes %>"><%= o.label %></span></h2>
+      <p class="text-xs text-slate-500">Last 60 days from the ledger · next 30 days projected from confirmed operations and average usage</p>
+    </div>
+    <svg id="skuBarcode" class="h-12 bg-white rounded px-2" aria-label="Barcode <%= product.sku %>"></svg>
+  </div>
+  <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 text-sm">
+    <div class="rounded-xl bg-slate-900/60 border border-slate-800 p-3"><p class="text-xs text-slate-500">Usage / day</p><p class="font-semibold text-white tabular-nums"><%= outlook.avgDaily ? (Math.round(outlook.avgDaily * 10) / 10).toLocaleString('en-IN') + ' ' + product.uom : '—' %></p></div>
+    <div class="rounded-xl bg-slate-900/60 border border-slate-800 p-3"><p class="text-xs text-slate-500">Days of cover</p><p class="font-semibold tabular-nums <%= outlook.daysOfCover !== null && outlook.daysOfCover <= outlook.leadTime ? 'text-red-400' : 'text-white' %>"><%= outlook.daysOfCover === null ? '—' : outlook.daysOfCover + (outlook.daysOfCover === 1 ? ' day' : ' days') %></p></div>
+    <div class="rounded-xl bg-slate-900/60 border border-slate-800 p-3"><p class="text-xs text-slate-500">Runs out</p><p class="font-semibold <%= outlook.stockoutDate ? 'text-amber-400' : 'text-white' %>"><%= outlook.status === 'out' ? 'Already out' : outlook.stockoutDate ? fmtDate(outlook.stockoutDate) : 'Not within 30 days' %></p></div>
+    <div class="rounded-xl bg-slate-900/60 border border-slate-800 p-3"><p class="text-xs text-slate-500">Order by</p><p class="font-semibold <%= outlook.orderByDate && new Date(outlook.orderByDate) <= new Date() ? 'text-red-400' : 'text-white' %>"><%= outlook.orderByDate ? (new Date(outlook.orderByDate) <= new Date() ? 'Now' : fmtDate(outlook.orderByDate)) : '—' %></p></div>
+    <div class="rounded-xl bg-slate-900/60 border border-slate-800 p-3"><p class="text-xs text-slate-500">Supplier · lead time</p><p class="font-semibold text-white truncate" title="<%= product.preferredSupplier %>"><%= product.preferredSupplier || '—' %> · <%= outlook.leadTime %>d</p></div>
+    <div class="rounded-xl bg-slate-900/60 border border-slate-800 p-3"><p class="text-xs text-slate-500">Stock value</p><p class="font-semibold text-white tabular-nums"><%= fmtMoney(onHand * (product.unitCost || 0)) %></p><p class="text-[11px] text-slate-500"><%= fmtMoney(product.unitCost || 0) %> / <%= product.uom %></p></div>
+  </div>
+  <div class="h-72"><canvas id="timelineChart" role="img" aria-label="On-hand stock over time with projection"></canvas></div>
+</section>
 
 <div class="grid lg:grid-cols-2 gap-6">
   <!-- Stock per location -->
@@ -170,6 +194,85 @@
     <p class="text-sm text-slate-300 whitespace-pre-line"><%= product.description %></p>
   </section>
 <% } %>
+
+<script type="application/json" id="timelineData"><%- jsonForScript({
+  labels: timeline.labels.map((d) => toDateInput(d)),
+  actual: timeline.actual,
+  projected: timeline.projected,
+  todayIndex: timeline.todayIndex,
+  stockoutIndex: timeline.forecast.stockoutDay === null ? null : timeline.todayIndex + timeline.forecast.stockoutDay,
+  orderByIndex: timeline.forecast.orderByDate && timeline.forecast.stockoutDay !== null ? timeline.todayIndex + timeline.forecast.stockoutDay - timeline.forecast.leadTime : null,
+  reorderLevel: product.reorderLevel || 0,
+  uom: product.uom,
+  sku: product.sku,
+}) %></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<script>
+  (() => {
+    const data = JSON.parse(document.getElementById('timelineData').textContent);
+    try {
+      JsBarcode('#skuBarcode', data.sku, { format: 'CODE128', height: 32, fontSize: 11, margin: 4, background: '#ffffff' });
+    } catch (e) {
+      document.getElementById('skuBarcode').remove();
+    }
+    if (!window.Chart) return;
+
+    const labels = data.labels.map((d) => new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }));
+    // Vertical markers: today, order-by date, projected stockout
+    const markers = [
+      { index: data.todayIndex, label: 'Today', color: '#94a3b8' },
+      data.orderByIndex !== null && data.orderByIndex >= 0 ? { index: data.orderByIndex, label: 'Order by', color: '#f59e0b' } : null,
+      data.stockoutIndex !== null ? { index: data.stockoutIndex, label: 'Stockout', color: '#ef4444' } : null,
+    ].filter(Boolean);
+    const markerPlugin = {
+      id: 'markers',
+      afterDatasetsDraw(chart) {
+        const { ctx, chartArea, scales } = chart;
+        markers.forEach((m, i) => {
+          const x = scales.x.getPixelForValue(Math.max(0, Math.min(labels.length - 1, m.index)));
+          ctx.save();
+          ctx.strokeStyle = m.color;
+          ctx.setLineDash([4, 4]);
+          ctx.beginPath();
+          ctx.moveTo(x, chartArea.top);
+          ctx.lineTo(x, chartArea.bottom);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = m.color;
+          ctx.font = '11px sans-serif';
+          ctx.fillText(m.label, x + 4, chartArea.top + 12 + i * 14);
+          ctx.restore();
+        });
+      },
+    };
+
+    new Chart(document.getElementById('timelineChart'), {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label: 'On hand', data: data.actual, borderColor: '#60a5fa', backgroundColor: 'rgba(96, 165, 250, 0.12)', fill: true, pointRadius: 0, tension: 0.25 },
+          { label: 'Projected', data: data.projected.map((v) => (v === null ? null : Math.max(0, v))), borderColor: '#f59e0b', borderDash: [6, 4], pointRadius: 0, tension: 0.25 },
+          { label: 'Reorder level', data: labels.map(() => data.reorderLevel), borderColor: 'rgba(248, 113, 113, 0.6)', borderDash: [2, 3], pointRadius: 0, borderWidth: 1 },
+        ],
+      },
+      options: {
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { labels: { color: '#94a3b8', boxWidth: 12 } },
+          tooltip: { callbacks: { label: (c) => (c.parsed.y === null ? null : `${c.dataset.label}: ${c.parsed.y} ${data.uom}`) } },
+        },
+        scales: {
+          x: { ticks: { color: '#64748b', maxTicksLimit: 10 }, grid: { display: false } },
+          y: { beginAtZero: true, min: 0, ticks: { color: '#64748b' }, grid: { color: 'rgba(148, 163, 184, 0.1)' } },
+        },
+      },
+      plugins: [markerPlugin],
+    });
+  })();
+</script>
 
 <% if (isManager) { %>
 <script>

@@ -1,0 +1,135 @@
+<%- include('../layout/app-top') %>
+<% const isManager = user.role === 'manager'; %>
+
+<div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+  <div>
+    <h1 class="text-2xl font-bold text-white tracking-tight">Warehouses &amp; locations</h1>
+    <p class="text-sm text-slate-400 mt-1">Each warehouse has locations (racks, bins, zones) that hold stock. The warehouse code prefixes every document, e.g. <span class="font-mono">WH/IN/0001</span>.</p>
+  </div>
+</div>
+
+<% if (isManager) { %>
+  <form id="newWarehouse" class="card p-4 grid md:grid-cols-4 gap-3" novalidate aria-label="New warehouse">
+    <input name="name" class="input" placeholder="Warehouse name" maxlength="80" required aria-label="Warehouse name">
+    <input name="code" class="input font-mono uppercase" placeholder="Code, e.g. WH3" maxlength="5" required aria-label="Warehouse code">
+    <input name="address" class="input" placeholder="Address (optional)" maxlength="200" aria-label="Address">
+    <button type="submit" class="btn btn-primary"><%- icon('plus', 'w-4 h-4') %> Add warehouse</button>
+  </form>
+<% } %>
+
+<div class="grid xl:grid-cols-2 gap-6">
+  <% warehouses.forEach((w) => { %>
+    <section class="card overflow-hidden" data-warehouse="<%= w._id %>">
+      <div class="flex flex-wrap items-start justify-between gap-3 px-4 py-4 border-b border-slate-800">
+        <div>
+          <h2 class="text-lg font-semibold text-white"><%= w.name %> <span class="ml-1 font-mono text-sm text-blue-300"><%= w.code %></span></h2>
+          <p class="text-xs text-slate-500"><%= w.address || 'No address' %> · <%= w.locations.filter((l) => l.isActive).length %> locations · <%= fmtMoney(w.value) %> in stock</p>
+        </div>
+        <div class="flex gap-2">
+          <a href="/labels?warehouse=<%= w._id %>" target="_blank" rel="noopener" class="btn btn-secondary btn-sm"><%- icon('printer', 'w-4 h-4') %> Bin labels</a>
+        </div>
+      </div>
+      <table class="min-w-full">
+        <thead class="bg-slate-900/80"><tr><th class="th">Location</th><th class="th text-right">Products</th><th class="th text-right">Value</th><% if (isManager) { %><th class="th"><span class="sr-only">Actions</span></th><% } %></tr></thead>
+        <tbody>
+          <% w.locations.forEach((l) => { %>
+            <tr class="border-t border-slate-800 <%= l.isActive ? '' : 'opacity-50' %>" data-location="<%= l._id %>">
+              <td class="td">
+                <a href="/locations/<%= l._id %>" class="font-medium text-white hover:text-blue-300" data-view><%= l.fullName %></a>
+                <% if (!l.isActive) { %><span class="badge bg-slate-500/10 text-slate-400 border-slate-500/30 ml-1">Archived</span><% } %>
+                <input data-edit class="input hidden" value="<%= l.name %>" maxlength="60" aria-label="Location name">
+              </td>
+              <td class="td text-right tabular-nums text-slate-300"><%= l.products %></td>
+              <td class="td text-right tabular-nums text-slate-400"><%= l.value ? fmtMoney(l.value) : '—' %></td>
+              <% if (isManager) { %>
+                <td class="td text-right whitespace-nowrap">
+                  <span data-view>
+                    <button type="button" class="btn btn-secondary btn-sm" data-action="rename">Rename</button>
+                    <% if (l.isActive) { %><button type="button" class="btn btn-danger btn-sm" data-action="archive">Archive</button>
+                    <% } else { %><button type="button" class="btn btn-success btn-sm" data-action="restore">Restore</button><% } %>
+                  </span>
+                  <span data-edit class="hidden">
+                    <button type="button" class="btn btn-primary btn-sm" data-action="save">Save</button>
+                    <button type="button" class="btn btn-secondary btn-sm" data-action="cancel">Cancel</button>
+                  </span>
+                </td>
+              <% } %>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <% if (isManager) { %>
+        <form class="flex gap-2 px-4 py-3 border-t border-slate-800" data-new-location novalidate>
+          <input name="name" class="input" placeholder="New location, e.g. Rack C" maxlength="60" aria-label="New location name">
+          <button type="submit" class="btn btn-secondary">Add</button>
+        </form>
+      <% } %>
+    </section>
+  <% }) %>
+</div>
+
+<% if (isManager) { %>
+<script>
+  (() => {
+    const { api, toast, toastAfterNavigation, setBusy } = window.StockSense;
+    const reloadWith = (message) => {
+      toastAfterNavigation(message);
+      window.location.reload();
+    };
+
+    document.getElementById('newWarehouse').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(e.target).entries());
+      if (!data.name.trim() || !data.code.trim()) return toast('Name and code are required', 'error');
+      const button = e.target.querySelector('button');
+      setBusy(button, true, 'Adding...');
+      try {
+        reloadWith((await api('POST', '/api/warehouses', data)).message);
+      } catch (err) {
+        toast(err.message, 'error');
+        setBusy(button, false);
+      }
+    });
+
+    document.querySelectorAll('[data-new-location]').forEach((form) => {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const name = form.querySelector('input[name=name]').value.trim(); // (form.name is the form's own attribute)
+        if (!name) return toast('Enter a location name', 'error');
+        const warehouse = form.closest('[data-warehouse]').dataset.warehouse;
+        try {
+          reloadWith((await api('POST', '/api/locations', { warehouse, name })).message);
+        } catch (err) {
+          toast(err.message, 'error');
+        }
+      });
+    });
+
+    document.querySelectorAll('[data-location]').forEach((row) => {
+      const id = row.dataset.location;
+      const toggle = (editing) => {
+        row.querySelectorAll('[data-view]').forEach((el) => el.classList.toggle('hidden', editing));
+        row.querySelectorAll('[data-edit]').forEach((el) => el.classList.toggle('hidden', !editing));
+      };
+      row.addEventListener('click', async (e) => {
+        const button = e.target.closest('[data-action]');
+        if (!button) return;
+        const action = button.dataset.action;
+        if (action === 'rename') return toggle(true);
+        if (action === 'cancel') return toggle(false);
+        try {
+          if (action === 'save') {
+            reloadWith((await api('PATCH', `/api/locations/${id}`, { name: row.querySelector('input[data-edit]').value })).message);
+          } else {
+            reloadWith((await api('POST', `/api/locations/${id}/${action}`)).message);
+          }
+        } catch (err) {
+          toast(err.message, 'error', 7000);
+        }
+      });
+    });
+  })();
+</script>
+<% } %>
+
+<%- include('../layout/app-bottom') %>

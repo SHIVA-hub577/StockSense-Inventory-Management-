@@ -11,9 +11,16 @@ const StockMove = require('../models/StockMove');
 const StockQuant = require('../models/StockQuant');
 const AppError = require('../utils/AppError');
 const stock = require('./stockService');
+const insights = require('./insightsService');
 const { searchRegex, pick } = require('../utils/requestHelpers');
 
-const PRODUCT_FIELDS = ['name', 'sku', 'category', 'uom', 'reorderLevel', 'reorderQty', 'description'];
+const PRODUCT_FIELDS = ['name', 'sku', 'category', 'uom', 'reorderLevel', 'reorderQty', 'unitCost', 'preferredSupplier', 'leadTimeDays', 'description'];
+const NUMBER_FIELDS = {
+  reorderLevel: 'Reorder level',
+  reorderQty: 'Reorder quantity',
+  unitCost: 'Unit cost',
+  leadTimeDays: 'Lead time',
+};
 const OPEN_STATUSES = ['draft', 'waiting', 'ready'];
 // Operations counted in the forecast (confirmed, not drafts) - same as Odoo
 const FORECAST_STATUSES = ['waiting', 'ready'];
@@ -84,6 +91,8 @@ const listProducts = async ({ search, category, stockStatus, archived = false, s
   let statusMatch = {};
   if (stockStatus === 'attention') {
     statusMatch = { stockStatus: { $in: ['low', 'out'] } };
+  } else if (stockStatus === 'instock') {
+    statusMatch = { stockStatus: { $in: ['ok', 'low'] } };
   } else if (['ok', 'low', 'out'].includes(stockStatus)) {
     statusMatch = { stockStatus };
   }
@@ -115,10 +124,19 @@ const listProducts = async ({ search, category, stockStatus, archived = false, s
   counts.attention = counts.low + counts.out;
 
   // Forecast for the rows on this page
-  const pending = await pendingQuantities(result.rows.map((r) => r._id));
+  const [pending, outlook] = await Promise.all([
+    pendingQuantities(result.rows.map((r) => r._id)),
+    insights.forecastsFor(result.rows),
+  ]);
   const rows = result.rows.map((row) => {
     const { incoming, outgoing } = pending.get(row._id.toString());
-    return { ...row, incoming, outgoing, forecast: stock.roundQty(row.onHand + incoming - outgoing) };
+    return {
+      ...row,
+      incoming,
+      outgoing,
+      forecast: stock.roundQty(row.onHand + incoming - outgoing),
+      outlook: outlook.get(row._id.toString()),
+    };
   });
 
   return { rows, total: result.total[0] ? result.total[0].n : 0, counts };
@@ -179,11 +197,14 @@ const getProductDetail = async (id) => {
   const onHand = stock.roundQty(locations.reduce((sum, q) => sum + q.quantity, 0));
   const { incoming, outgoing } = pending.get(String(id));
 
+  const outlook = (await insights.forecastsFor([product])).get(String(product._id));
+
   return {
     product,
     onHand,
     incoming,
     outgoing,
+    outlook,
     forecast: stock.roundQty(onHand + incoming - outgoing),
     stockStatus: stockStatusOf(onHand, product.reorderLevel),
     locations,
@@ -203,21 +224,21 @@ const getProductDetail = async (id) => {
 const cleanProductInput = async (data) => {
   const fields = pick(data, PRODUCT_FIELDS);
 
-  for (const key of ['name', 'sku', 'description', 'uom']) {
+  for (const key of ['name', 'sku', 'description', 'uom', 'preferredSupplier']) {
     if (typeof fields[key] === 'string') {
       fields[key] = fields[key].trim();
     }
   }
-  for (const key of ['reorderLevel', 'reorderQty']) {
+  for (const [key, label] of Object.entries(NUMBER_FIELDS)) {
     if (fields[key] === '' || fields[key] === null) {
-      fields[key] = 0;
+      fields[key] = key === 'leadTimeDays' ? 7 : 0;
     }
     if (fields[key] !== undefined) {
       const n = Number(fields[key]);
       if (!Number.isFinite(n) || n < 0) {
-        throw new AppError(`${key === 'reorderLevel' ? 'Reorder level' : 'Reorder quantity'} must be a number of 0 or more`);
+        throw new AppError(`${label} must be a number of 0 or more`);
       }
-      fields[key] = stock.roundQty(n);
+      fields[key] = key === 'leadTimeDays' ? Math.round(n) : stock.roundQty(n);
     }
   }
   if (fields.category === '' || fields.category === null) {

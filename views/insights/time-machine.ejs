@@ -1,0 +1,109 @@
+<%- include('../layout/app-top') %>
+<%
+  const today = toDateInput(new Date());
+  const minDate = toDateInput(firstDate);
+  const daysSpan = Math.max(1, Math.round((new Date(today) - new Date(minDate)) / 86400000));
+  const offset = Math.max(0, Math.min(daysSpan, Math.round((new Date(filters.date) - new Date(minDate)) / 86400000)));
+  const valueDelta = currentValue - totalValue;
+%>
+
+<div class="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+  <div>
+    <h1 class="text-2xl font-bold text-white tracking-tight flex items-center gap-2"><%- icon('history', 'w-6 h-6 text-blue-400') %> Time machine</h1>
+    <p class="text-sm text-slate-400 mt-1">Your exact inventory at the end of any day, rebuilt move-by-move from the ledger.</p>
+  </div>
+</div>
+
+<form method="GET" action="/insights/time-machine" id="tmForm" class="card p-5 space-y-4" aria-label="Choose a date">
+  <div class="flex flex-col lg:flex-row lg:items-center gap-4">
+    <div class="flex-1 space-y-2">
+      <div class="flex justify-between text-xs text-slate-500"><span><%= fmtDate(firstDate) %></span><span>Today</span></div>
+      <input type="range" id="tmSlider" min="0" max="<%= daysSpan %>" value="<%= offset %>" class="w-full accent-blue-500" aria-label="Days since the first recorded move">
+    </div>
+    <div class="flex items-center gap-2">
+      <input type="date" name="date" id="tmDate" min="<%= minDate %>" max="<%= today %>" value="<%= filters.date %>" class="input w-44" aria-label="Date">
+      <button type="submit" class="btn btn-primary">Travel</button>
+    </div>
+  </div>
+  <div class="grid sm:grid-cols-3 gap-3">
+    <input type="search" name="search" value="<%= filters.search %>" class="input" placeholder="Product name or SKU" aria-label="Search">
+    <select name="warehouse" class="input" aria-label="Warehouse">
+      <option value="">All warehouses</option>
+      <% warehouses.forEach((w) => { %><option value="<%= w._id %>" <%= String(w._id) === filters.warehouse ? 'selected' : '' %>><%= w.name %></option><% }) %>
+    </select>
+    <select name="category" class="input" aria-label="Category">
+      <option value="">All categories</option>
+      <% categories.forEach((c) => { %><option value="<%= c._id %>" <%= String(c._id) === filters.category ? 'selected' : '' %>><%= c.name %></option><% }) %>
+    </select>
+  </div>
+</form>
+
+<div class="grid sm:grid-cols-3 gap-4">
+  <div class="card p-4">
+    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Stock value on <%= fmtDate(asOf) %></p>
+    <p class="mt-2 text-3xl font-bold tabular-nums text-white"><%= fmtMoney(totalValue) %></p>
+  </div>
+  <div class="card p-4">
+    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Value today</p>
+    <p class="mt-2 text-3xl font-bold tabular-nums text-white"><%= fmtMoney(currentValue) %></p>
+    <p class="text-xs mt-1 <%= valueDelta >= 0 ? 'text-emerald-400' : 'text-red-400' %>"><%= valueDelta >= 0 ? '+' : '−' %><%= fmtMoney(Math.abs(valueDelta)) %> since then</p>
+  </div>
+  <div class="card p-4">
+    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Products in stock then</p>
+    <p class="mt-2 text-3xl font-bold tabular-nums text-white"><%= productsInStock %></p>
+  </div>
+</div>
+
+<div class="card overflow-hidden">
+  <% if (rows.length === 0) { %>
+    <p class="p-12 text-center text-slate-400">No stock recorded on <%= fmtDate(asOf) %> for these filters.</p>
+  <% } else { %>
+    <div class="overflow-x-auto">
+      <table class="min-w-full">
+        <thead class="bg-slate-900/80">
+          <tr>
+            <th class="th">Product</th>
+            <th class="th">Where it was</th>
+            <th class="th text-right">On <%= fmtDate(asOf) %></th>
+            <th class="th text-right">Value then</th>
+            <th class="th text-right">Today</th>
+            <th class="th text-right">Change</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% rows.forEach((r) => { const p = r.product; %>
+            <tr class="border-t border-slate-800 hover:bg-slate-800/30">
+              <td class="td"><a href="/products/<%= p._id %>" class="font-medium text-white hover:text-blue-300"><%= p.name %></a><div class="text-xs font-mono text-slate-500"><%= p.sku %></div></td>
+              <td class="td text-xs text-slate-400">
+                <% if (r.locations.length === 0) { %>—<% } %>
+                <% r.locations.forEach((l) => { %><span class="inline-block mr-2 whitespace-nowrap"><%= l.location %>: <span class="text-slate-200 tabular-nums"><%= fmtQty(l.qty) %></span></span><% }) %>
+              </td>
+              <td class="td text-right tabular-nums font-semibold <%= r.total <= 0 ? 'text-red-400' : 'text-white' %>"><%= fmtQty(r.total) %> <span class="text-xs font-normal text-slate-500"><%= p.uom %></span></td>
+              <td class="td text-right tabular-nums text-slate-400"><%= r.value ? fmtMoney(r.value) : '—' %></td>
+              <td class="td text-right tabular-nums text-slate-300"><%= fmtQty(r.current) %></td>
+              <td class="td text-right tabular-nums font-semibold <%= r.delta > 0 ? 'text-emerald-400' : r.delta < 0 ? 'text-red-400' : 'text-slate-500' %>"><%= r.delta === 0 ? '0' : (r.delta > 0 ? '+' : '') + fmtQty(r.delta) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>
+
+<script>
+  (() => {
+    const slider = document.getElementById('tmSlider');
+    const dateInput = document.getElementById('tmDate');
+    const form = document.getElementById('tmForm');
+    const min = new Date('<%= minDate %>T00:00:00');
+    const toInput = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    slider.addEventListener('input', () => {
+      const d = new Date(min);
+      d.setDate(d.getDate() + Number(slider.value));
+      dateInput.value = toInput(d);
+    });
+    slider.addEventListener('change', () => form.submit());
+  })();
+</script>
+
+<%- include('../layout/app-bottom') %>

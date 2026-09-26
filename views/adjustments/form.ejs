@@ -1,0 +1,114 @@
+<%- include('../layout/app-top') %>
+<%
+  const isEdit = Boolean(operation);
+  const op = operation || {};
+  const idOf = (v) => (v && v._id ? String(v._id) : v ? String(v) : '');
+  const isManager = user.role === 'manager';
+  const locationsByWarehouse = {};
+  locations.forEach((l) => {
+    const key = l.warehouse ? `${l.warehouse.name} (${l.warehouse.code})` : 'Other';
+    (locationsByWarehouse[key] = locationsByWarehouse[key] || []).push(l);
+  });
+  const selectedLocation = isEdit ? idOf(op.sourceLocation) : prefill.location;
+%>
+
+<nav class="text-sm text-slate-500" aria-label="Breadcrumb">
+  <a href="/adjustments" class="hover:text-slate-300">Stock counts</a> <span class="mx-1">/</span>
+  <% if (isEdit) { %><a href="/operations/<%= op._id %>" class="hover:text-slate-300 font-mono"><%= op.reference %></a> <span class="mx-1">/</span> <span class="text-slate-300">Edit</span>
+  <% } else { %><span class="text-slate-300">New count</span><% } %>
+</nav>
+
+<div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+  <div>
+    <h1 class="text-2xl font-bold text-white tracking-tight"><%= isEdit ? 'Edit ' + op.reference : 'New stock count' %></h1>
+    <p class="text-sm text-slate-400 mt-1">Count what is physically on the shelf. Differences are booked when an Inventory Manager applies the count.</p>
+  </div>
+</div>
+
+<form id="countForm" class="space-y-6" novalidate>
+  <div id="formError" class="hidden rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300" role="alert"></div>
+
+  <section class="card p-6 grid md:grid-cols-3 gap-5">
+    <div>
+      <label for="location" class="label">Location counted *</label>
+      <select id="location" name="location" class="input" required>
+        <option value="">Choose a location</option>
+        <% Object.entries(locationsByWarehouse).forEach(([warehouseName, locs]) => { %>
+          <optgroup label="<%= warehouseName %>">
+            <% locs.forEach((l) => { %><option value="<%= l._id %>" <%= selectedLocation === String(l._id) ? 'selected' : '' %>><%= l.fullName %></option><% }) %>
+          </optgroup>
+        <% }) %>
+      </select>
+    </div>
+    <div>
+      <label for="scheduledDate" class="label">Count date</label>
+      <input id="scheduledDate" name="scheduledDate" type="date" class="input" value="<%= toDateInput(op.scheduledDate) %>">
+    </div>
+    <div class="flex items-end">
+      <label class="flex items-start gap-3 rounded-xl border border-slate-700 px-3 py-2.5 w-full cursor-pointer select-none">
+        <input type="checkbox" id="blindCount" class="mt-0.5 accent-blue-500" <%= op.blindCount ? 'checked' : '' %> <%= isManager ? '' : 'disabled' %>>
+        <span class="text-sm text-slate-300">Blind count<span class="block text-xs text-slate-500"><%= isManager ? 'Hide recorded quantities from counters' : 'Set by an Inventory Manager' %></span></span>
+      </label>
+    </div>
+    <div class="md:col-span-3">
+      <label for="notes" class="label">Notes</label>
+      <input id="notes" name="notes" class="input" maxlength="500" value="<%= op.notes || '' %>" placeholder="e.g. Monthly cycle count, rack A">
+    </div>
+  </section>
+
+  <section class="card overflow-hidden">
+    <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-slate-800">
+      <h2 class="text-sm font-semibold text-white">Count sheet</h2>
+      <div class="flex flex-wrap gap-2">
+        <button type="button" id="loadExpected" class="btn btn-secondary btn-sm">Load products stored here</button>
+        <button type="button" id="copyRecorded" class="btn btn-secondary btn-sm" data-recorded-only>Counted = recorded</button>
+        <button type="button" id="zeroAll" class="btn btn-secondary btn-sm" title="Start from zero and count by scanning">Start from zero</button>
+      </div>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="min-w-full">
+        <thead class="bg-slate-900/80">
+          <tr>
+            <th class="th w-2/5">Product</th>
+            <th class="th text-right" data-recorded-only>Recorded</th>
+            <th class="th w-36">Counted</th>
+            <th class="th text-right" data-recorded-only>Difference</th>
+            <th class="th text-right" data-recorded-only>Value</th>
+            <th class="th w-44">Reason</th>
+            <th class="th"><span class="sr-only">Remove</span></th>
+          </tr>
+        </thead>
+        <tbody id="lines"></tbody>
+        <tfoot data-recorded-only>
+          <tr class="border-t border-slate-700">
+            <td class="td text-right text-slate-400" colspan="3">Net difference value</td>
+            <td class="td"></td>
+            <td class="td text-right font-semibold tabular-nums" id="totalValue">₹0</td>
+            <td class="td" colspan="2"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <div class="px-4 py-3 border-t border-slate-800">
+      <button type="button" id="addLine" class="btn btn-secondary btn-sm"><%- icon('plus', 'w-4 h-4') %> Add product</button>
+    </div>
+  </section>
+
+  <div class="flex flex-col-reverse sm:flex-row justify-end gap-3">
+    <a href="<%= isEdit ? '/operations/' + op._id : '/adjustments' %>" class="btn btn-secondary">Cancel</a>
+    <button type="submit" class="btn btn-secondary" data-submit="draft">Save draft</button>
+    <button type="submit" class="btn btn-primary" data-submit="confirm">Save &amp; submit for approval</button>
+  </div>
+</form>
+
+<script type="application/json" id="countFormData"><%- jsonForScript({
+  operationId: isEdit ? String(op._id) : null,
+  isManager,
+  products,
+  lines: isEdit ? op.lines.map((l) => ({ product: idOf(l.product), quantity: l.quantity, reason: l.reason || 'count' })) : [],
+  prefillProduct: prefill.product,
+  reasons: REASON_META,
+}) %></script>
+<script src="/js/count-sheet.js"></script>
+
+<%- include('../layout/app-bottom') %>

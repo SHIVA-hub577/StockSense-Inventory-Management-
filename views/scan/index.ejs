@@ -1,0 +1,50 @@
+<%- include('../layout/app-top') %>
+
+<div class="max-w-2xl mx-auto space-y-6">
+  <div>
+    <h1 class="text-2xl font-bold text-white tracking-tight flex items-center gap-2"><%- icon('scan', 'w-7 h-7 text-blue-400') %> Scan anything</h1>
+    <p class="text-sm text-slate-400 mt-1">Scan a product, a location label or a document barcode to open it. Works with USB scanners, the camera, or typing.</p>
+  </div>
+
+  <section class="card p-5 space-y-4" aria-label="Scanner">
+    <div class="flex justify-end">
+      <button type="button" id="cameraToggle" class="btn btn-secondary btn-sm"><%- icon('scan', 'w-4 h-4') %> Use camera</button>
+    </div>
+    <form id="scanForm" class="flex gap-2" autocomplete="off">
+      <input id="scanInput" class="input font-mono text-lg flex-1" placeholder="SKU, location (e.g. WH/Rack A) or reference" aria-label="Code">
+      <button type="submit" class="btn btn-primary">Open</button>
+    </form>
+    <div id="scanCamera" class="hidden rounded-xl overflow-hidden border border-slate-700"></div>
+    <ul id="scanLog" class="space-y-1 text-sm" aria-live="polite"></ul>
+  </section>
+
+  <section class="card p-5 text-sm text-slate-400 space-y-2">
+    <p class="font-semibold text-white">Tips</p>
+    <ul class="list-disc pl-5 space-y-1">
+      <li>Print labels from a product page, <a href="/settings/warehouses" class="text-blue-400 hover:text-blue-300">Warehouses</a> (bin labels) or any document's print view.</li>
+      <li>On an open receipt, delivery or count, use its own scan box to pick or count items.</li>
+      <li>Phone cameras need the app served over HTTPS (localhost works on the same machine).</li>
+    </ul>
+  </section>
+</div>
+
+<script src="/js/scan.js"></script>
+<script>
+  (() => {
+    const { api } = window.StockSense;
+    window.StockSenseScanner.attach({
+      form: document.getElementById('scanForm'),
+      input: document.getElementById('scanInput'),
+      log: document.getElementById('scanLog'),
+      cameraButton: document.getElementById('cameraToggle'),
+      cameraBox: document.getElementById('scanCamera'),
+      onCode: async (code) => {
+        const res = await api('GET', `/api/scan/resolve?code=${encodeURIComponent(code)}`);
+        setTimeout(() => { window.location.href = res.data.url; }, 350);
+        return { message: `Opening ${res.data.label}` };
+      },
+    });
+  })();
+</script>
+
+<%- include('../layout/app-bottom') %>

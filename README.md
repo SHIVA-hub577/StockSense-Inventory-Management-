@@ -72,12 +72,29 @@ Once the terminal displays `[Server] Running in development mode on port 5000` a
 - 🔒 **Forgot Password Page**: [http://localhost:5000/auth/forgot-password](http://localhost:5000/auth/forgot-password)
 - 📊 **Dashboard**: [http://localhost:5000/dashboard](http://localhost:5000/dashboard)
 - 📦 **Products / Categories**: [/products](http://localhost:5000/products) · [/categories](http://localhost:5000/categories)
-- 🚚 **Operations**: [/receipts](http://localhost:5000/receipts) · [/deliveries](http://localhost:5000/deliveries) · [/transfers](http://localhost:5000/transfers)
+- 🚚 **Operations**: [/receipts](http://localhost:5000/receipts) · [/deliveries](http://localhost:5000/deliveries) · [/transfers](http://localhost:5000/transfers) · [/adjustments](http://localhost:5000/adjustments) (stock counts)
+- 📜 **Move History**: [/moves](http://localhost:5000/moves) · ⏳ **Time Machine**: [/insights/time-machine](http://localhost:5000/insights/time-machine) · 🔁 **Replenishment**: [/replenishment](http://localhost:5000/replenishment)
+- 🏭 **Warehouses**: [/settings/warehouses](http://localhost:5000/settings/warehouses) · 📷 **Scan**: [/scan](http://localhost:5000/scan)
 - 👤 **My Profile**: [/profile](http://localhost:5000/profile)
 
 After `npm run seed`, log in with the demo accounts listed in `scripts/seed.js`.
 
 ---
+
+## ⭐ Highlights
+
+### 1. Live Warehouse (real-time)
+Every screen stays in sync without refreshing: when anyone confirms, picks, packs, scans or validates, dashboards, lists, badges and the activity feed update instantly (Server-Sent Events, `GET /api/live`). Operation pages show who else is viewing them. Try it with two browsers logged in as different users.
+
+### 2. Scan & Pick
+Printable Code 128 labels for products, bins and documents (`/labels`). On any open receipt, delivery or stock count, scan with a USB scanner, the camera or the keyboard: the right item counts up, a wrong item or wrong bin is refused with a buzz, over-picking is blocked, and a fully scanned delivery marks itself picked. `/scan` opens whatever you scan. (Phone cameras need HTTPS; `localhost` works on the same machine.)
+
+### 3. Stock Time Machine & Stockout Forecast
+- **Time Machine**: exact stock per product and location at the end of any past day, rebuilt from the ledger, with value and change since.
+- **Forecast**: per product, average daily usage (last 30 days), days of cover, predicted stockout date and "order by" date (stockout − supplier lead time), drawn on a 60-day history + 30-day projection chart.
+- **Replenishment**: everything heading for a stockout, grouped by preferred supplier with suggested quantities, turned into confirmed receipts in one click. Stock already on its way is counted, so nothing is ordered twice.
+
+Also: brief KPIs + dynamic filters (document type, status, warehouse, category) on the dashboard, a "Today" board (receive → pick → pack → ship, late), stock counts with reasons, blind counts and manager approval, Move History with running balances and CSV export, low-stock alerts (in-app bell + email to managers), and warehouse/location management.
 
 ## 📡 API Endpoints
 
@@ -115,3 +132,23 @@ All endpoints return JSON `{ success, message, data }`. Mutations marked **Manag
 | `POST` | `/api/operations/:id/validate` | Any (adjustments: Manager) | Apply stock changes + write the ledger (transaction) |
 | `POST` | `/api/operations/:id/reset` | `/cancel` | `/duplicate` | Any | Back to draft / cancel / copy as a new draft |
 | `GET` | `/api/stock/available?location=&products=a,b` | Any | On-hand quantities at one location |
+
+### ⭐ Stock control, insights & live API (`/api`, login required)
+
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| `GET` | `/api/dashboard?type=&status=&warehouse=&category=` | Any | KPIs, today board, 14-day flow, stock outlook, activity |
+| `POST` | `/api/operations` with `type: "adjustment"` | Any | Stock count: `location`, `blindCount`, `lines: [{ product, quantity (counted), reason }]` (reasons: `count`, `damaged`, `lost`, `found`, `expired`); validating (applying) needs a Manager |
+| `POST` | `/api/operations/:id/scan` | Any | Scan `{ code, quantity? }`: SKU or location label against an open operation |
+| `GET` | `/api/stock/at-location?location=` | Any | Everything stored in a location (count sheets) |
+| `GET` | `/api/products/:id/timeline` | Any | Daily on-hand history + projection + forecast metrics |
+| `GET` / `POST` | `/api/replenishment` | Any | Suggested orders grouped by supplier / create receipts `{ groups: [{ supplier, destLocation, lines }] }` |
+| `GET` / `POST` | `/api/warehouses` | Any / Manager | List with locations and value / create (adds a `Stock` location) |
+| `PATCH` | `/api/warehouses/:id` | Manager | Rename / address (the code is fixed) |
+| `POST` / `PATCH` | `/api/locations` · `/api/locations/:id` | Manager | Create / rename a location |
+| `POST` | `/api/locations/:id/archive` \| `/restore` | Manager | Archive (must be empty with no open operations) / restore |
+| `GET` | `/api/live?view=operation:<id>` | Any | Server-Sent Events stream: `operation`, `alert`, `presence` |
+| `GET` | `/api/nav-counts` | Any | Sidebar badges, unread alerts, who is online |
+| `GET` / `POST` | `/api/alerts` · `/api/alerts/read-all` | Any | Low / out-of-stock alerts (last 30 days) / mark read |
+| `GET` | `/api/scan/resolve?code=` | Any | Product, location or document for a scanned code |
+| `GET` | `/moves/export.csv?product=&location=&type=&user=&from=&to=` | Any | Ledger as CSV |

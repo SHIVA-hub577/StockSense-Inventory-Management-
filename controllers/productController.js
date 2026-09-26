@@ -3,6 +3,7 @@
  */
 const productService = require('../services/productService');
 const lookups = require('../services/lookupService');
+const insights = require('../services/insightsService');
 const { UNITS_OF_MEASURE } = require('../models/Product');
 const { parsePage } = require('../utils/requestHelpers');
 const { buildQuery } = require('../utils/viewHelpers');
@@ -21,7 +22,7 @@ const paginationFor = (page, limit, total) => ({
 const readListFilters = (query) => ({
   search: (query.search || '').toString().trim(),
   category: (query.category || '').toString(),
-  status: ['ok', 'low', 'out', 'attention'].includes(query.status) ? query.status : '',
+  status: ['ok', 'low', 'out', 'attention', 'instock'].includes(query.status) ? query.status : '',
   archived: query.archived === '1' ? '1' : '',
 });
 
@@ -59,11 +60,16 @@ const listPage = async (req, res) => {
 };
 
 const showPage = async (req, res) => {
-  const detail = await productService.getProductDetail(req.params.id);
+  const [detail, timeline] = await Promise.all([
+    productService.getProductDetail(req.params.id),
+    insights.productTimeline(req.params.id),
+  ]);
   res.render('products/show', {
     title: `${detail.product.name} - StockSense`,
     activeNav: 'products',
+    liveView: `product:${detail.product._id}`,
     ...detail,
+    timeline,
   });
 };
 

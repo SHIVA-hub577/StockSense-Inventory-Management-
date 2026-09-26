@@ -4,61 +4,65 @@
   const sections = [
     { title: null, items: [
       { key: 'dashboard', href: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
+      { key: 'scan', href: '/scan', label: 'Scan', icon: 'scan' },
     ] },
     { title: 'Inventory', items: [
-      { key: 'products', href: '/products', label: 'Products', icon: 'products', badge: nav.stockAlerts, tone: 'amber', badgeTitle: 'Products low or out of stock' },
+      { key: 'products', href: '/products', label: 'Products', icon: 'products', badge: 'stockAlerts', tone: 'amber', badgeTitle: 'Products low or out of stock' },
       { key: 'categories', href: '/categories', label: 'Categories', icon: 'categories' },
+      { key: 'replenishment', href: '/replenishment', label: 'Replenishment', icon: 'replenish' },
+      { key: 'timemachine', href: '/insights/time-machine', label: 'Time Machine', icon: 'history' },
     ] },
     { title: 'Operations', items: [
-      { key: 'receipts', href: '/receipts', label: 'Receipts', icon: 'receipts', badge: nav.receipt, badgeTitle: 'Receipts to process' },
-      { key: 'deliveries', href: '/deliveries', label: 'Delivery Orders', icon: 'deliveries', badge: nav.delivery, badgeTitle: 'Deliveries to process' },
-      { key: 'transfers', href: '/transfers', label: 'Internal Transfers', icon: 'transfers', badge: nav.internal, badgeTitle: 'Transfers to process' },
-      { key: 'adjustments', label: 'Adjustments', icon: 'adjustments', soon: true },
-      { key: 'history', label: 'Move History', icon: 'history', soon: true },
+      { key: 'receipts', href: '/receipts', label: 'Receipts', icon: 'receipts', badge: 'receipt', badgeTitle: 'Receipts to process' },
+      { key: 'deliveries', href: '/deliveries', label: 'Delivery Orders', icon: 'deliveries', badge: 'delivery', badgeTitle: 'Deliveries to process' },
+      { key: 'transfers', href: '/transfers', label: 'Internal Transfers', icon: 'transfers', badge: 'internal', badgeTitle: 'Transfers to process' },
+      { key: 'adjustments', href: '/adjustments', label: 'Stock Counts', icon: 'adjustments', badge: 'adjustment', badgeTitle: 'Counts waiting for approval' },
+      { key: 'history', href: '/moves', label: 'Move History', icon: 'timemachine' },
     ] },
     { title: 'Settings', items: [
-      { key: 'warehouses', label: 'Warehouses', icon: 'warehouses', soon: true },
+      { key: 'warehouses', href: '/settings/warehouses', label: 'Warehouses', icon: 'warehouses' },
     ] },
   ];
 %>
 <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-64 -translate-x-full lg:translate-x-0 transition-transform duration-200 bg-slate-950 border-r border-slate-800 flex flex-col" aria-label="Main navigation">
-  <a href="/dashboard" class="h-16 shrink-0 flex items-center gap-3 px-5 border-b border-slate-800">
-    <span class="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold shadow-lg shadow-blue-500/30">SS</span>
-    <span class="text-lg font-bold text-white tracking-tight">StockSense</span>
-  </a>
+  <div class="h-16 shrink-0 flex items-center justify-between gap-3 px-4 border-b border-slate-800">
+    <a href="/dashboard" class="flex items-center gap-3">
+      <span class="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold shadow-lg shadow-blue-500/30">SS</span>
+      <span class="text-lg font-bold text-white tracking-tight">StockSense</span>
+    </a>
+    <button type="button" id="alertBell" class="relative p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800" aria-label="Stock alerts" aria-haspopup="true" aria-expanded="false">
+      <%- icon('bell', 'w-5 h-5') %>
+      <span data-nav-badge="unreadAlerts" class="absolute -top-0.5 -right-0.5 min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center <%= nav.unreadAlerts ? '' : 'hidden' %>"><%= nav.unreadAlerts || 0 %></span>
+    </button>
+  </div>
 
-  <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-6">
+  <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-5">
     <% sections.forEach((section) => { %>
       <div class="space-y-1">
         <% if (section.title) { %>
           <p class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500"><%= section.title %></p>
         <% } %>
-        <% section.items.forEach((item) => { %>
-          <% if (item.soon) { %>
-            <span class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-600 cursor-not-allowed" title="Coming soon">
-              <%- icon(item.icon, 'w-5 h-5 shrink-0') %>
-              <span class="flex-1 truncate"><%= item.label %></span>
-              <span class="text-[10px] font-semibold uppercase tracking-wide text-slate-600 border border-slate-800 rounded px-1.5 py-0.5">Soon</span>
-            </span>
-          <% } else { %>
-            <% const active = current === item.key; %>
-            <a href="<%= item.href %>"
-               class="group flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors <%= active ? 'bg-blue-600/15 text-white ring-1 ring-blue-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' %>"
-               <%= active ? 'aria-current=page' : '' %>>
-              <span class="<%= active ? 'text-blue-400' : 'text-slate-500 group-hover:text-slate-300' %>"><%- icon(item.icon, 'w-5 h-5 shrink-0') %></span>
-              <span class="flex-1 truncate"><%= item.label %></span>
-              <% if (item.badge) { %>
-                <span class="min-w-[1.5rem] text-center text-[11px] font-bold rounded-full px-1.5 py-0.5 <%= item.tone === 'amber' ? 'bg-amber-500/15 text-amber-400' : 'bg-blue-500/15 text-blue-300' %>" title="<%= item.badgeTitle %>"><%= item.badge %></span>
-              <% } %>
-            </a>
-          <% } %>
+        <% section.items.forEach((item) => { const active = current === item.key; const count = item.badge ? nav[item.badge] || 0 : 0; %>
+          <a href="<%= item.href %>"
+             class="group flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors <%= active ? 'bg-blue-600/15 text-white ring-1 ring-blue-500/30' : 'text-slate-400 hover:text-white hover:bg-slate-800/60' %>"
+             <%= active ? 'aria-current=page' : '' %>>
+            <span class="<%= active ? 'text-blue-400' : 'text-slate-500 group-hover:text-slate-300' %>"><%- icon(item.icon, 'w-5 h-5 shrink-0') %></span>
+            <span class="flex-1 truncate"><%= item.label %></span>
+            <% if (item.badge) { %>
+              <span data-nav-badge="<%= item.badge %>" class="min-w-[1.5rem] text-center text-[11px] font-bold rounded-full px-1.5 py-0.5 <%= item.tone === 'amber' ? 'bg-amber-500/15 text-amber-400' : 'bg-blue-500/15 text-blue-300' %> <%= count ? '' : 'hidden' %>" title="<%= item.badgeTitle %>"><%= count %></span>
+            <% } %>
+          </a>
         <% }) %>
       </div>
     <% }) %>
   </nav>
 
-  <!-- Profile menu -->
+  <!-- Live status + profile menu -->
   <div class="shrink-0 border-t border-slate-800 p-3 space-y-1">
+    <p id="liveStatus" class="flex items-center gap-2 px-3 pb-1 text-xs text-slate-500" title="Changes made by anyone appear here instantly">
+      <span class="relative flex w-2 h-2"><span data-live-dot class="absolute inline-flex w-full h-full rounded-full bg-slate-500"></span></span>
+      <span data-live-text>Connecting…</span>
+    </p>
     <a href="/profile" class="flex items-center gap-3 px-3 py-2 rounded-lg transition-colors <%= current === 'profile' ? 'bg-blue-600/15 ring-1 ring-blue-500/30' : 'hover:bg-slate-800/60' %>">
       <span class="w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-xs font-bold <%= user.role === 'manager' ? 'bg-purple-500/20 text-purple-300' : 'bg-amber-500/20 text-amber-300' %>"><%= initials(user.name) %></span>
       <span class="min-w-0">
@@ -71,3 +75,13 @@
     </a>
   </div>
 </aside>
+
+<!-- Alerts panel (filled by /js/live.js) -->
+<div id="alertPanel" class="hidden fixed z-50 top-16 left-4 lg:left-60 w-[22rem] max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl" role="dialog" aria-label="Stock alerts">
+  <div class="flex items-center justify-between px-4 py-3 border-b border-slate-800">
+    <p class="text-sm font-semibold text-white">Stock alerts</p>
+    <button type="button" id="alertsReadAll" class="text-xs text-blue-400 hover:text-blue-300">Mark all read</button>
+  </div>
+  <ul id="alertList" class="max-h-96 overflow-y-auto divide-y divide-slate-800 text-sm"></ul>
+  <a href="/replenishment" class="block px-4 py-3 border-t border-slate-800 text-sm text-center text-blue-400 hover:text-blue-300">Open replenishment →</a>
+</div>

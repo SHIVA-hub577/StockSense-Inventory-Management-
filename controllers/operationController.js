@@ -5,6 +5,7 @@
 const mongoose = require('mongoose');
 const Operation = require('../models/Operation');
 const Product = require('../models/Product');
+const StockQuant = require('../models/StockQuant');
 const AppError = require('../utils/AppError');
 const stock = require('../services/stockService');
 const queries = require('../services/operationQueries');
@@ -14,7 +15,7 @@ const { parsePage, parseDateInput, pick, ownKey } = require('../utils/requestHel
 const { paginationFor } = require('./productController');
 
 const PAGE_SIZE = 20;
-const WRITE_FIELDS = ['type', 'partner', 'sourceLocation', 'destLocation', 'location', 'scheduledDate', 'notes', 'lines'];
+const WRITE_FIELDS = ['type', 'partner', 'sourceLocation', 'destLocation', 'location', 'scheduledDate', 'notes', 'lines', 'blindCount'];
 
 // Request body -> service input (whitelisted, dates parsed, lines normalised)
 const readOperationInput = (body = {}) => {
@@ -27,6 +28,9 @@ const readOperationInput = (body = {}) => {
       data[key] = data[key].trim().slice(0, 500);
     }
   }
+  if (data.blindCount !== undefined) {
+    data.blindCount = data.blindCount === true || data.blindCount === 'true' || data.blindCount === '1';
+  }
   if (data.lines !== undefined) {
     if (!Array.isArray(data.lines)) {
       throw new AppError('Lines must be a list of { product, quantity }');
@@ -34,6 +38,7 @@ const readOperationInput = (body = {}) => {
     data.lines = data.lines.map((line) => ({
       product: line && line.product,
       quantity: line && line.quantity !== '' ? Number(line.quantity) : NaN,
+      ...(line && typeof line.reason === 'string' ? { reason: line.reason } : {}),
     }));
   }
   return data;
@@ -87,6 +92,21 @@ const listPage = (type) => async (req, res) => {
 const newPage = (type) => async (req, res) => {
   const data = await formLookups(type);
 
+  if (type === 'adjustment') {
+    // Count sheet, optionally prefilled from a product / location page
+    return res.render('adjustments/form', {
+      title: 'New Stock Count - StockSense',
+      activeNav: 'adjustments',
+      meta: OPERATION_META.adjustment,
+      operation: null,
+      prefill: {
+        location: mongoose.isValidObjectId(req.query.location) ? String(req.query.location) : '',
+        product: mongoose.isValidObjectId(req.query.product) ? String(req.query.product) : '',
+      },
+      ...data,
+    });
+  }
+
   // Prefill from "Reorder" links: /receipts/new?product=<id>&qty=<n>
   const prefill = { lines: [] };
   if (mongoose.isValidObjectId(req.query.product)) {
@@ -113,6 +133,7 @@ const showPage = async (req, res) => {
   res.render('operations/show', {
     title: `${operation.reference} - StockSense`,
     activeNav: OPERATION_META[operation.type].slug,
+    liveView: `operation:${operation._id}`,
     meta: OPERATION_META[operation.type],
     operation,
     shortages,
@@ -122,10 +143,20 @@ const showPage = async (req, res) => {
 
 const editPage = async (req, res) => {
   const { operation } = await queries.getOperationDetail(req.params.id);
-  if (operation.status !== 'draft' || operation.type === 'adjustment') {
+  if (operation.status !== 'draft') {
     return res.redirect(`/operations/${operation._id}`);
   }
   const data = await formLookups(operation.type);
+  if (operation.type === 'adjustment') {
+    return res.render('adjustments/form', {
+      title: `Edit ${operation.reference} - StockSense`,
+      activeNav: 'adjustments',
+      meta: OPERATION_META.adjustment,
+      operation,
+      prefill: { location: '', product: '' },
+      ...data,
+    });
+  }
   res.render('operations/form', {
     title: `Edit ${operation.reference} - StockSense`,
     activeNav: OPERATION_META[operation.type].slug,
@@ -176,7 +207,13 @@ const apiList = async (req, res) => {
 };
 
 const apiShow = async (req, res) => {
-  res.json({ success: true, data: await queries.getOperationDetail(req.params.id) });
+  const detail = await queries.getOperationDetail(req.params.id);
+  if (detail.operation.blindCount && req.user.role !== 'manager') {
+    detail.operation.lines.forEach((line) => {
+      delete line.recorded;
+    });
+  }
+  res.json({ success: true, data: detail });
 };
 
 const apiCreate = async (req, res) => {
@@ -187,12 +224,12 @@ const apiCreate = async (req, res) => {
 const apiUpdate = async (req, res) => {
   const input = readOperationInput(req.body);
   delete input.type; // the type of an operation never changes
-  const operation = await stock.updateDraftOperation(req.params.id, input);
+  const operation = await stock.updateDraftOperation(req.params.id, input, req.user);
   res.json({ success: true, message: `${operation.reference} saved`, data: { operation } });
 };
 
 const apiConfirm = async (req, res) => {
-  const { operation, shortages } = await stock.confirmOperation(req.params.id);
+  const { operation, shortages } = await stock.confirmOperation(req.params.id, req.user);
   const message =
     operation.status === 'ready'
       ? `${operation.reference} is ready to process`
@@ -213,12 +250,12 @@ const apiValidate = async (req, res) => {
 };
 
 const apiCancel = async (req, res) => {
-  const operation = await stock.cancelOperation(req.params.id);
+  const operation = await stock.cancelOperation(req.params.id, req.user);
   res.json({ success: true, message: `${operation.reference} canceled`, data: { operation } });
 };
 
 const apiReset = async (req, res) => {
-  const operation = await stock.resetToDraft(req.params.id);
+  const operation = await stock.resetToDraft(req.params.id, req.user);
   res.json({ success: true, message: `${operation.reference} is back to draft`, data: { operation } });
 };
 
@@ -233,6 +270,47 @@ const apiDeliveryStep = (step) => async (req, res) => {
     success: true,
     message: `${operation.reference} ${step === 'pick' ? 'picked' : 'packed'}`,
     data: { operation },
+  });
+};
+
+// POST /api/operations/:id/scan { code, quantity? }
+const apiScan = async (req, res) => {
+  const body = req.body || {};
+  const result = await stock.scanCode(req.params.id, body.code, req.user, body.quantity);
+  const { operation } = result;
+  res.json({
+    success: true,
+    message: result.message,
+    data: {
+      kind: result.kind,
+      complete: Boolean(result.complete),
+      autoPicked: Boolean(result.autoPicked),
+      product: result.product || null,
+      operation: {
+        _id: operation._id,
+        status: operation.status,
+        pickedAt: operation.pickedAt,
+        lines: operation.lines.map((l) => ({ product: l.product, quantity: l.quantity, scannedQty: l.scannedQty, reason: l.reason })),
+      },
+    },
+  });
+};
+
+// GET /api/stock/at-location?location=<id> -> everything stored there (count sheets)
+const apiStockAtLocation = async (req, res) => {
+  if (!mongoose.isValidObjectId(req.query.location)) {
+    throw new AppError('Query parameter "location" must be a location id');
+  }
+  const quants = await StockQuant.find({ location: req.query.location, quantity: { $gt: 0 } })
+    .populate('product', 'name sku uom unitCost isActive')
+    .lean();
+  res.json({
+    success: true,
+    data: {
+      stock: quants
+        .filter((q) => q.product && q.product.isActive)
+        .map((q) => ({ product: q.product._id, name: q.product.name, sku: q.product.sku, uom: q.product.uom, unitCost: q.product.unitCost || 0, quantity: q.quantity })),
+    },
   });
 };
 
@@ -267,4 +345,6 @@ module.exports = {
   apiDuplicate,
   apiDeliveryStep,
   apiAvailable,
+  apiScan,
+  apiStockAtLocation,
 };

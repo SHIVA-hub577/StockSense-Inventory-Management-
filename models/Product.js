@@ -41,6 +41,23 @@ const productSchema = new mongoose.Schema(
       min: [0, 'Reorder quantity cannot be negative'],
       default: 0,
     },
+    // Cost of one unit (for stock value, variance value and value-based charts)
+    unitCost: {
+      type: Number,
+      min: [0, 'Unit cost cannot be negative'],
+      default: 0,
+    },
+    // Replenishment: who we usually buy from and how long they take to deliver
+    preferredSupplier: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    leadTimeDays: {
+      type: Number,
+      min: [0, 'Lead time cannot be negative'],
+      default: 7,
+    },
     description: {
       type: String,
       trim: true,

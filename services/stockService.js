@@ -10,6 +10,7 @@
  * the ledger (StockMove) and the operation status are committed together or
  * not at all. Transactions need a replica set (Atlas, or `npm run db` locally).
  */
+const { EventEmitter } = require('events');
 const mongoose = require('mongoose');
 const Operation = require('../models/Operation');
 const Location = require('../models/Location');
@@ -20,7 +21,23 @@ const StockMove = require('../models/StockMove');
 const Counter = require('../models/Counter');
 const AppError = require('../utils/AppError');
 
-const { OPERATION_TYPES, REFERENCE_PREFIX } = Operation;
+const { OPERATION_TYPES, REFERENCE_PREFIX, ADJUSTMENT_REASONS } = Operation;
+
+/**
+ * Every successful lifecycle action is announced here:
+ *   events.on('operation', ({ action, operation, user, crossings }) => ...)
+ * The activity feed, live updates and low-stock alerts subscribe (see app.js),
+ * so the engine itself stays free of those concerns.
+ */
+const events = new EventEmitter();
+events.setMaxListeners(20);
+const announce = (action, operation, user = null, extra = {}) => {
+  try {
+    events.emit('operation', { action, operation, user, ...extra });
+  } catch (err) {
+    console.error(`[Stock] listener failed for ${action}: ${err.message}`);
+  }
+};
 
 const QTY_DECIMALS = 3; // e.g. 0.125 kg
 const EPSILON = 1e-9;
@@ -103,7 +120,7 @@ const normalizeLines = async (type, rawLines) => {
     throw new AppError('Add at least one product line');
   }
 
-  const merged = new Map(); // productId -> quantity
+  const merged = new Map(); // productId -> { quantity, reason }
   for (const raw of rawLines) {
     const productId = toId(raw && raw.product);
     if (!productId || !mongoose.isValidObjectId(productId)) {
@@ -120,14 +137,22 @@ const normalizeLines = async (type, rawLines) => {
       );
     }
 
+    let reason = null;
+    if (type === 'adjustment') {
+      reason = raw.reason || 'count';
+      if (!ADJUSTMENT_REASONS.includes(reason)) {
+        throw new AppError(`Reason must be one of: ${ADJUSTMENT_REASONS.join(', ')}`);
+      }
+    }
+
     const key = productId.toString();
     if (merged.has(key)) {
       if (type === 'adjustment') {
         throw new AppError('Each product can only be counted once per adjustment');
       }
-      merged.set(key, roundQty(merged.get(key) + quantity));
+      merged.get(key).quantity = roundQty(merged.get(key).quantity + quantity);
     } else {
-      merged.set(key, quantity);
+      merged.set(key, { quantity, reason });
     }
   }
 
@@ -142,7 +167,9 @@ const normalizeLines = async (type, rawLines) => {
     throw new AppError(`Product "${archived.name}" is archived`);
   }
 
-  return [...merged.entries()].map(([product, quantity]) => ({ product, quantity }));
+  return [...merged.entries()].map(([product, { quantity, reason }]) =>
+    type === 'adjustment' ? { product, quantity, reason } : { product, quantity }
+  );
 };
 
 const nextReference = async (warehouseId, type) => {
@@ -228,6 +255,16 @@ const findShortages = async (operation, session = null) => {
   }));
 };
 
+// Total on-hand per product across all internal locations
+const totalsFor = async (productIds, session = null) => {
+  const ids = productIds.map((id) => new mongoose.Types.ObjectId(String(id)));
+  const rows = await StockQuant.aggregate([
+    { $match: { product: { $in: ids } } },
+    { $group: { _id: '$product', quantity: { $sum: '$quantity' } } },
+  ]).session(session);
+  return new Map(rows.map((r) => [r._id.toString(), roundQty(r.quantity)]));
+};
+
 const shortageError = async (operation, shortages, session = null) => {
   const location = await Location.findById(toId(operation.sourceLocation))
     .select('fullName')
@@ -274,7 +311,8 @@ const refreshWaitingOperations = async (locationIds) => {
     const shortages = await findShortages(operation);
     if (shortages.length === 0) {
       operation.status = 'ready';
-      await operation.save().catch(() => {}); // best effort: a concurrent change wins
+      const saved = await operation.save().then(() => true).catch(() => false); // a concurrent change wins
+      if (saved) announce('ready', operation);
     }
   }
 };
@@ -305,7 +343,7 @@ const createOperation = async (data = {}, user = null) => {
   const warehouse = warehouseOf(source, dest);
   const reference = await nextReference(warehouse, type);
 
-  return Operation.create({
+  const operation = await Operation.create({
     reference,
     type,
     status: 'draft',
@@ -316,15 +354,19 @@ const createOperation = async (data = {}, user = null) => {
     scheduledDate: data.scheduledDate || Date.now(),
     lines,
     notes: data.notes || '',
+    // Only a manager can make a count blind (the counter must not be able to lift it)
+    blindCount: type === 'adjustment' && Boolean(data.blindCount) && Boolean(user && user.role === 'manager'),
     createdBy: toId(user),
   });
+  announce('created', operation, user);
+  return operation;
 };
 
 /**
  * Edit a draft operation (lines, locations, partner, date, notes).
  * Locations must stay in the same warehouse because the reference encodes it.
  */
-const updateDraftOperation = async (operationId, data = {}) => {
+const updateDraftOperation = async (operationId, data = {}, user = null) => {
   const operation = await findOperationOr404(operationId);
   if (operation.status !== 'draft') {
     throw new AppError(`Only draft operations can be edited (${operation.reference} is ${operation.status})`, 409);
@@ -351,8 +393,12 @@ const updateDraftOperation = async (operationId, data = {}) => {
       operation[field] = data[field];
     }
   }
+  if (operation.type === 'adjustment' && data.blindCount !== undefined && user && user.role === 'manager') {
+    operation.blindCount = Boolean(data.blindCount);
+  }
 
   await operation.save();
+  announce('updated', operation, user);
   return operation;
 };
 
@@ -361,7 +407,7 @@ const updateDraftOperation = async (operationId, data = {}) => {
  * Outgoing operations become "waiting" when stock is short.
  * @returns {{ operation, shortages }}
  */
-const confirmOperation = async (operationId) => {
+const confirmOperation = async (operationId, user = null) => {
   const operation = await findOperationOr404(operationId);
   if (!['draft', 'waiting'].includes(operation.status)) {
     throw new AppError(`Only draft or waiting operations can be confirmed (${operation.reference} is ${operation.status})`, 409);
@@ -370,6 +416,7 @@ const confirmOperation = async (operationId) => {
   const shortages = await findShortages(operation);
   operation.status = shortages.length ? 'waiting' : 'ready';
   await operation.save();
+  announce(operation.status === 'ready' ? 'confirmed' : 'waiting', operation, user, { shortages });
   return { operation, shortages };
 };
 
@@ -381,6 +428,7 @@ const confirmOperation = async (operationId) => {
  */
 const validateOperation = async (operationId, user = null) => {
   let validated;
+  let crossings = [];
 
   try {
     await mongoose.connection.transaction(async (session) => {
@@ -400,6 +448,9 @@ const validateOperation = async (operationId, user = null) => {
       if (shortages.length) {
         throw await shortageError(operation, shortages, session);
       }
+
+      const productIds = [...new Set(operation.lines.map((l) => String(l.product)))];
+      const before = await totalsFor(productIds, session);
 
       const now = new Date();
       const source = operation.sourceLocation;
@@ -457,6 +508,9 @@ const validateOperation = async (operationId, user = null) => {
       operation.validatedBy = toId(user);
       operation.validatedAt = now;
       await operation.save({ session });
+
+      const after = await totalsFor(productIds, session);
+      crossings = productIds.map((id) => ({ product: id, before: before.get(id) || 0, after: after.get(id) || 0 }));
       validated = operation;
     });
   } catch (err) {
@@ -476,6 +530,8 @@ const validateOperation = async (operationId, user = null) => {
     throw err;
   }
 
+  announce('validated', validated, user, { crossings });
+
   // Stock arrived at the destination (receipt / transfer) or possibly at the
   // counted location (adjustment) -> waiting operations there may be ready now.
   // Best effort: the validation is already committed, so never fail because of this.
@@ -493,7 +549,7 @@ const validateOperation = async (operationId, user = null) => {
  * Cancel an open operation. Done operations cannot be canceled
  * (reverse them with a new operation instead).
  */
-const cancelOperation = async (operationId) => {
+const cancelOperation = async (operationId, user = null) => {
   if (!mongoose.isValidObjectId(operationId)) {
     throw new AppError('Operation not found', 404);
   }
@@ -503,6 +559,7 @@ const cancelOperation = async (operationId) => {
     { returnDocument: 'after' }
   );
   if (operation) {
+    announce('canceled', operation, user);
     return operation;
   }
 
@@ -517,7 +574,7 @@ const cancelOperation = async (operationId) => {
  * Put a waiting/ready operation back to draft so it can be edited.
  * Clears pick/pack progress.
  */
-const resetToDraft = async (operationId) => {
+const resetToDraft = async (operationId, user = null) => {
   const operation = await findOperationOr404(operationId);
   if (!['waiting', 'ready'].includes(operation.status)) {
     throw new AppError(`Only waiting or ready operations can be reset to draft (${operation.reference} is ${operation.status})`, 409);
@@ -527,7 +584,11 @@ const resetToDraft = async (operationId) => {
   operation.pickedBy = null;
   operation.packedAt = null;
   operation.packedBy = null;
+  operation.lines.forEach((line) => {
+    line.scannedQty = 0;
+  });
   await operation.save();
+  announce('reset', operation, user);
   return operation;
 };
 
@@ -564,6 +625,7 @@ const markDeliveryStep = async (operationId, step, user = null) => {
   }
 
   await operation.save();
+  announce(step === 'pick' ? 'picked' : 'packed', operation, user);
   return operation;
 };
 
@@ -588,6 +650,120 @@ const duplicateOperation = async (operationId, user = null) => {
     },
     user
   );
+};
+
+/**
+ * Scan & Pick: apply one barcode scan to an operation.
+ *  - product code (SKU) on a receipt / delivery / transfer: counts one more unit
+ *    towards that line; items not on the order and over-picks are refused
+ *  - product code on a draft count sheet: adds to the counted quantity
+ *    (unexpected products are added as new lines)
+ *  - location label: confirms the operator is at the right bin
+ * A delivery whose lines are all scanned is marked picked automatically.
+ * @returns {{ kind, message, operation, product?, complete?, autoPicked? }}
+ */
+const scanCode = async (operationId, rawCode, user = null, rawQuantity = 1) => {
+  const code = String(rawCode || '').trim();
+  if (!code) {
+    throw new AppError('Scan a barcode or type a code');
+  }
+  const quantity = roundQty(rawQuantity === undefined || rawQuantity === '' ? 1 : rawQuantity);
+  if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 1000000) {
+    throw new AppError('Scanned quantity must be a number between 0 and 1,000,000');
+  }
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const operation = await findOperationOr404(operationId);
+    if (!OPEN_STATUSES.includes(operation.status)) {
+      throw new AppError(`${operation.reference} is already ${operation.status}`, 409);
+    }
+
+    const product = await Product.findOne({ sku: code.toUpperCase() }).select('name sku uom isActive').lean();
+
+    if (!product) {
+      // Not a product: maybe a bin / location label
+      const escaped = code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const location = await Location.findOne({ fullName: new RegExp(`^${escaped}$`, 'i') }).select('fullName').lean();
+      if (!location) {
+        throw new AppError(`Unknown code "${code}"`, 404);
+      }
+      const expected = operation.type === 'receipt' ? operation.destLocation : operation.sourceLocation;
+      if (!location._id.equals(expected)) {
+        const expectedLoc = await Location.findById(expected).select('fullName').lean();
+        throw new AppError(`Wrong location: ${operation.reference} uses ${expectedLoc ? expectedLoc.fullName : 'another location'}, not ${location.fullName}`, 422, {
+          code: 'WRONG_LOCATION',
+        });
+      }
+      return { kind: 'location', message: `Location ${location.fullName} confirmed`, operation };
+    }
+
+    let line;
+    if (operation.type === 'adjustment') {
+      if (operation.status !== 'draft') {
+        throw new AppError('Counts can only be scanned while the count sheet is a draft', 409);
+      }
+      line = operation.lines.find((l) => l.product.equals(product._id));
+      if (!line) {
+        if (!product.isActive) {
+          throw new AppError(`Product "${product.name}" is archived`);
+        }
+        operation.lines.push({ product: product._id, quantity: 0, reason: 'count', scannedQty: 0 });
+        line = operation.lines[operation.lines.length - 1];
+      }
+      line.quantity = roundQty(line.quantity + quantity);
+      line.scannedQty = roundQty((line.scannedQty || 0) + quantity);
+    } else {
+      if (operation.type === 'delivery' && operation.status !== 'ready') {
+        throw new AppError(`${operation.reference} must be ready (stock available) before picking`, 409);
+      }
+      if (operation.type === 'delivery' && operation.packedAt) {
+        throw new AppError(`${operation.reference} is already packed`, 409);
+      }
+      line = operation.lines.find((l) => l.product.equals(product._id));
+      if (!line) {
+        throw new AppError(`${product.name} (${product.sku}) is not on ${operation.reference}`, 422, {
+          code: 'WRONG_ITEM',
+          product: { _id: product._id, name: product.name, sku: product.sku },
+        });
+      }
+      if ((line.scannedQty || 0) + EPSILON >= line.quantity) {
+        throw new AppError(`All ${line.quantity} ${product.uom} of ${product.name} are already scanned`, 409, {
+          code: 'OVER_SCAN',
+        });
+      }
+      line.scannedQty = roundQty(Math.min(line.quantity, (line.scannedQty || 0) + quantity));
+    }
+
+    const complete =
+      operation.type !== 'adjustment' && operation.lines.every((l) => (l.scannedQty || 0) + EPSILON >= l.quantity);
+    let autoPicked = false;
+    if (complete && operation.type === 'delivery' && !operation.pickedAt) {
+      operation.pickedAt = new Date();
+      operation.pickedBy = toId(user);
+      autoPicked = true;
+    }
+
+    try {
+      await operation.save();
+    } catch (err) {
+      if (err.name === 'VersionError' && attempt < 2) continue; // concurrent scan: reload and retry
+      throw err;
+    }
+
+    announce('scanned', operation, user, { product, complete });
+    if (autoPicked) announce('picked', operation, user);
+
+    const progress = operation.type === 'adjustment' ? `counted ${line.quantity}` : `${line.scannedQty}/${line.quantity}`;
+    return {
+      kind: 'product',
+      message: `${product.name}: ${progress} ${product.uom}${autoPicked ? ' - all items picked' : complete ? ' - all items scanned' : ''}`,
+      operation,
+      product,
+      complete,
+      autoPicked,
+    };
+  }
+  throw new AppError('Too many simultaneous scans - try again', 409);
 };
 
 /**
@@ -644,8 +820,11 @@ module.exports = {
   resetToDraft,
   markDeliveryStep,
   duplicateOperation,
+  scanCode,
   findShortages,
   getAvailableAt,
+  totalsFor,
+  events,
   getOnHandTotals,
   getStockByLocation,
   roundQty,

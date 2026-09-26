@@ -20,6 +20,10 @@ const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
 
+// Live feed + low-stock alerts listen to the stock engine
+require('./services/activityService').start();
+require('./services/alertService').start();
+
 // View Engine Setup (EJS) + helpers available in every template
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));

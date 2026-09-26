@@ -3,7 +3,8 @@
   const base = '/' + meta.slug;
   const query = { tab: filters.tab, warehouse: filters.warehouse, search: filters.search, late: filters.late };
   const hasFilters = filters.warehouse || filters.search || filters.late;
-  const iconName = { receipt: 'receipts', delivery: 'deliveries', internal: 'transfers' }[type];
+  const iconName = { receipt: 'receipts', delivery: 'deliveries', internal: 'transfers', adjustment: 'adjustments' }[type];
+  const isCount = type === 'adjustment';
   const productSummary = (op) => {
     const names = op.lines.map((l) => (l.product ? l.product.name : 'Unknown product'));
     return names.slice(0, 2).join(', ') + (names.length > 2 ? ` +${names.length - 2} more` : '');
@@ -55,7 +56,7 @@
   </div>
 </form>
 
-<div class="card overflow-hidden">
+<div class="card overflow-hidden transition-shadow" data-live-region="list">
   <% if (operations.length === 0) { %>
     <div class="p-12 text-center space-y-3">
       <div class="inline-flex w-12 h-12 items-center justify-center rounded-2xl bg-slate-800 text-slate-400"><%- icon(iconName, 'w-6 h-6') %></div>
@@ -72,8 +73,8 @@
         <thead class="bg-slate-900/80">
           <tr>
             <th class="th">Reference</th>
-            <th class="th"><%= type === 'internal' ? 'Route' : meta.partnerLabel %></th>
-            <% if (type !== 'internal') { %><th class="th"><%= type === 'receipt' ? 'Destination' : 'Source' %></th><% } %>
+            <th class="th"><%= isCount ? 'Location counted' : type === 'internal' ? 'Route' : meta.partnerLabel %></th>
+            <% if (type !== 'internal' && !isCount) { %><th class="th"><%= type === 'receipt' ? 'Destination' : 'Source' %></th><% } %>
             <th class="th">Products</th>
             <th class="th">Scheduled</th>
             <th class="th">Status</th>
@@ -88,7 +89,9 @@
                   <div class="text-[11px] text-slate-500 mt-0.5"><%= op.packedAt ? 'Packed' : op.pickedAt ? 'Picked' : 'To pick' %></div>
                 <% } %>
               </td>
-              <% if (type === 'internal') { %>
+              <% if (isCount) { %>
+                <td class="td text-slate-300 whitespace-nowrap"><%= op.sourceLocation.fullName %><%= op.blindCount ? ' · blind' : '' %></td>
+              <% } else if (type === 'internal') { %>
                 <td class="td text-slate-300 whitespace-nowrap"><%= op.sourceLocation.fullName %> <span class="text-slate-500">→</span> <%= op.destLocation.fullName %></td>
               <% } else { %>
                 <td class="td text-slate-200"><%= op.partner || '—' %></td>
@@ -99,7 +102,7 @@
                 <%= fmtDate(op.scheduledDate) %>
                 <% if (late) { %><span class="badge bg-red-500/10 text-red-400 border-red-500/30 ml-1">Late</span><% } %>
               </td>
-              <td class="td"><span class="badge <%= STATUS_META[op.status].classes %>"><%= STATUS_META[op.status].label %></span></td>
+              <td class="td"><span class="badge <%= STATUS_META[op.status].classes %>"><%= isCount && op.status === 'ready' ? 'Awaiting approval' : STATUS_META[op.status].label %></span></td>
             </tr>
           <% }) %>
         </tbody>

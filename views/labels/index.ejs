@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <title><%= title %></title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: #0f172a; background: #f1f5f9; margin: 0; padding: 24px; }
+    .toolbar { max-width: 210mm; margin: 0 auto 16px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .toolbar p { margin: 0; color: #475569; font-size: 14px; }
+    .toolbar button { font: inherit; font-size: 14px; font-weight: 600; padding: 8px 14px; border-radius: 8px; border: 1px solid #2563eb; background: #2563eb; color: #fff; cursor: pointer; }
+    .sheet { max-width: 210mm; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(62mm, 1fr)); gap: 4mm; }
+    .label { background: #fff; border: 1px dashed #94a3b8; border-radius: 6px; padding: 4mm; display: flex; flex-direction: column; gap: 1.5mm; break-inside: avoid; page-break-inside: avoid; }
+    .kind { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b; }
+    .title { font-size: 14px; font-weight: 700; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sub { font-size: 11px; color: #475569; }
+    svg.barcode { width: 100%; height: 16mm; }
+    @media print {
+      body { background: #fff; padding: 0; }
+      .toolbar { display: none; }
+      .label { border-color: #cbd5e1; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <p><%= labels.length %> label(s) · Code 128 barcodes, readable by USB scanners and the StockSense camera scanner</p>
+    <button type="button" onclick="window.print()">Print labels</button>
+  </div>
+  <div class="sheet">
+    <% labels.forEach((l) => { %>
+      <div class="label">
+        <span class="kind"><%= l.kind %></span>
+        <span class="title" title="<%= l.title %>"><%= l.title %></span>
+        <svg class="barcode" data-code="<%= l.code %>"></svg>
+        <span class="sub"><%= l.subtitle %></span>
+      </div>
+    <% }) %>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+  <script>
+    document.querySelectorAll('svg.barcode').forEach((svg) => {
+      try {
+        JsBarcode(svg, svg.dataset.code, { format: 'CODE128', displayValue: true, fontSize: 12, margin: 0, height: 50 });
+      } catch (e) {
+        svg.outerHTML = '<p style="color:#b91c1c;font-size:11px">Cannot encode this code</p>';
+      }
+    });
+  </script>
+</body>
+</html>

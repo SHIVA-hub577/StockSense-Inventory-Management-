@@ -21,7 +21,7 @@ const getCategories = () => Category.find().sort({ name: 1 }).lean();
 // Active products for line pickers (name, SKU, unit, category name)
 const getProductOptions = async () => {
   const products = await Product.find({ isActive: true })
-    .select('name sku uom category')
+    .select('name sku uom category unitCost')
     .populate('category', 'name')
     .sort({ name: 1 })
     .lean();
@@ -30,6 +30,7 @@ const getProductOptions = async () => {
     name: p.name,
     sku: p.sku,
     uom: p.uom,
+    unitCost: p.unitCost || 0,
     category: p.category ? p.category.name : 'Uncategorised',
   }));
 };

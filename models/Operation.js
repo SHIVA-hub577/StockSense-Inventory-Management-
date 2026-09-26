@@ -22,6 +22,9 @@ const mongoose = require('mongoose');
 const OPERATION_TYPES = ['receipt', 'delivery', 'internal', 'adjustment'];
 const OPERATION_STATUSES = ['draft', 'waiting', 'ready', 'done', 'canceled'];
 
+// Why a stock count differs from the recorded quantity
+const ADJUSTMENT_REASONS = ['count', 'damaged', 'lost', 'found', 'expired'];
+
 // Reference prefixes, e.g. WH/IN/0001
 const REFERENCE_PREFIX = {
   receipt: 'IN',
@@ -46,6 +49,21 @@ const operationLineSchema = new mongoose.Schema(
     theoreticalQty: {
       type: Number,
       default: null,
+    },
+    // Adjustments only: why the count differs
+    reason: {
+      type: String,
+      enum: {
+        values: [...ADJUSTMENT_REASONS, null],
+        message: 'Reason must be one of: ' + ADJUSTMENT_REASONS.join(', '),
+      },
+      default: null,
+    },
+    // Scan & Pick progress: units scanned against this line
+    scannedQty: {
+      type: Number,
+      min: 0,
+      default: 0,
     },
   },
   { _id: true }
@@ -112,6 +130,11 @@ const operationSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    // Adjustments: hide the recorded quantity from the person counting
+    blindCount: {
+      type: Boolean,
+      default: false,
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -168,3 +191,4 @@ module.exports = Operation;
 module.exports.OPERATION_TYPES = OPERATION_TYPES;
 module.exports.OPERATION_STATUSES = OPERATION_STATUSES;
 module.exports.REFERENCE_PREFIX = REFERENCE_PREFIX;
+module.exports.ADJUSTMENT_REASONS = ADJUSTMENT_REASONS;

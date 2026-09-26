@@ -59,6 +59,27 @@
     </div>
   </fieldset>
 
+  <fieldset class="rounded-xl border border-slate-800 p-4 space-y-4">
+    <legend class="px-2 text-sm font-semibold text-white">Cost &amp; purchasing</legend>
+    <div class="grid sm:grid-cols-3 gap-5">
+      <div>
+        <label for="unitCost" class="label">Unit cost (₹)</label>
+        <input id="unitCost" name="unitCost" type="number" min="0" step="any" class="input" value="<%= p.unitCost ?? 0 %>">
+        <p class="text-xs text-slate-500 mt-1">Used for stock value and count differences.</p>
+      </div>
+      <div>
+        <label for="preferredSupplier" class="label">Preferred supplier</label>
+        <input id="preferredSupplier" name="preferredSupplier" class="input" maxlength="200" value="<%= p.preferredSupplier || '' %>" placeholder="e.g. Tata Steel">
+        <p class="text-xs text-slate-500 mt-1">Replenishment groups orders by supplier.</p>
+      </div>
+      <div>
+        <label for="leadTimeDays" class="label">Lead time (days)</label>
+        <input id="leadTimeDays" name="leadTimeDays" type="number" min="0" step="1" class="input" value="<%= p.leadTimeDays ?? 7 %>">
+        <p class="text-xs text-slate-500 mt-1">How long the supplier takes to deliver.</p>
+      </div>
+    </div>
+  </fieldset>
+
   <% if (!isEdit) { %>
     <fieldset class="rounded-xl border border-slate-800 p-4 space-y-4">
       <legend class="px-2 text-sm font-semibold text-white">Initial stock <span class="font-normal text-slate-500">(optional)</span></legend>

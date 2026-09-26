@@ -4,9 +4,13 @@
   const isOpen = ['draft', 'waiting', 'ready'].includes(op.status);
   const isDelivery = op.type === 'delivery';
   const isOutgoing = ['delivery', 'internal'].includes(op.type);
-  const isAdjustment = op.type === 'adjustment';
+  const isCount = op.type === 'adjustment';
+  const isManager = user.role === 'manager';
   const late = isLate(op);
-  const canValidate = isOpen && (isAdjustment ? user.role === 'manager' : !isDelivery || (op.status === 'ready' && op.packedAt));
+  const canValidate = isOpen && (isCount ? isManager : !isDelivery || (op.status === 'ready' && op.packedAt));
+  const canScan = isCount ? op.status === 'draft' : isDelivery ? op.status === 'ready' && !op.packedAt : isOpen;
+  const hideRecorded = isCount && op.blindCount && !isManager && isOpen;
+  const showProgress = !isCount && isOpen && op.lines.some((l) => l.scannedQty > 0 || canScan);
 
   // Progress stepper
   const flow = isDelivery ? ['draft', 'ready', 'picked', 'packed', 'done'] : ['draft', 'ready', 'done'];
@@ -14,180 +18,262 @@
   if (op.status === 'waiting') currentStep = 'ready';
   if (isDelivery && op.status === 'ready') currentStep = op.packedAt ? 'packed' : op.pickedAt ? 'picked' : 'ready';
   const currentIndex = flow.indexOf(currentStep);
-  const stepLabel = (step) => ({ draft: 'Draft', ready: op.status === 'waiting' ? 'Waiting' : 'Ready', picked: 'Picked', packed: 'Packed', done: 'Done' }[step]);
+  const stepLabel = (step) => ({
+    draft: 'Draft',
+    ready: op.status === 'waiting' ? 'Waiting' : isCount ? 'Submitted' : 'Ready',
+    picked: 'Picked',
+    packed: 'Packed',
+    done: isCount ? 'Applied' : 'Done',
+  }[step]);
 
   // Which action is the obvious next step
   let primary = null;
-  if (op.status === 'draft') primary = 'confirm';
-  else if (op.status === 'waiting') primary = 'confirm';
+  if (op.status === 'draft' || op.status === 'waiting') primary = 'confirm';
   else if (op.status === 'ready') primary = isDelivery && !op.pickedAt ? 'pick' : isDelivery && !op.packedAt ? 'pack' : 'validate';
   const btn = (action) => 'btn ' + (primary === action ? 'btn-primary' : 'btn-secondary');
   const fromLabel = op.type === 'receipt' ? (op.partner || op.sourceLocation.fullName) : op.sourceLocation.fullName;
   const toLabel = op.type === 'delivery' ? (op.partner || op.destLocation.fullName) : op.destLocation.fullName;
+
+  // Count lines: recorded (open: live on-hand, applied: frozen), difference and value
+  const countRows = isCount ? op.lines.map((l) => {
+    const recorded = isOpen ? l.recorded : l.theoreticalQty;
+    const diff = recorded === null || recorded === undefined ? null : Math.round((l.quantity - recorded) * 1000) / 1000;
+    return { line: l, recorded, diff, value: diff === null ? null : diff * (l.product.unitCost || 0) };
+  }) : [];
+  const netValue = countRows.reduce((sum, r) => sum + (r.value || 0), 0);
 %>
 
 <nav class="text-sm text-slate-500" aria-label="Breadcrumb">
-  <% if (isAdjustment) { %><span><%= meta.plural %></span><% } else { %><a href="/<%= meta.slug %>" class="hover:text-slate-300"><%= meta.plural %></a><% } %>
+  <a href="/<%= meta.slug %>" class="hover:text-slate-300"><%= isCount ? 'Stock counts' : meta.plural %></a>
   <span class="mx-1">/</span> <span class="text-slate-300 font-mono"><%= op.reference %></span>
 </nav>
 
-<div class="flex flex-col xl:flex-row xl:items-start justify-between gap-4">
-  <div class="space-y-2">
-    <div class="flex flex-wrap items-center gap-3">
-      <h1 class="text-2xl font-bold text-white tracking-tight font-mono"><%= op.reference %></h1>
-      <span class="badge <%= STATUS_META[op.status].classes %>"><%= STATUS_META[op.status].label %></span>
-      <% if (late) { %><span class="badge bg-red-500/10 text-red-400 border-red-500/30">Late</span><% } %>
+<div data-live-region="operation" data-can-scan="<%= canScan %>" class="space-y-6 rounded-2xl transition-shadow">
+  <div class="flex flex-col xl:flex-row xl:items-start justify-between gap-4">
+    <div class="space-y-2">
+      <div class="flex flex-wrap items-center gap-3">
+        <h1 class="text-2xl font-bold text-white tracking-tight font-mono"><%= op.reference %></h1>
+        <span class="badge <%= STATUS_META[op.status].classes %>"><%= isCount && op.status === 'ready' ? 'Awaiting approval' : STATUS_META[op.status].label %></span>
+        <% if (late) { %><span class="badge bg-red-500/10 text-red-400 border-red-500/30">Late</span><% } %>
+        <% if (isCount && op.blindCount) { %><span class="badge bg-slate-500/10 text-slate-300 border-slate-500/30">Blind count</span><% } %>
+      </div>
+      <p class="text-sm text-slate-400"><%= isCount ? `Stock count · ${op.sourceLocation.fullName}` : `${meta.label} · ${fromLabel} → ${toLabel}` %></p>
     </div>
-    <p class="text-sm text-slate-400"><%= meta.label %> · <%= fromLabel %> → <%= toLabel %></p>
-  </div>
 
-  <div class="flex flex-wrap gap-2" id="operationActions">
-    <% if (op.status === 'draft') { %>
-      <% if (!isAdjustment) { %><a href="/operations/<%= op._id %>/edit" class="btn btn-secondary"><%- icon('pencil', 'w-4 h-4') %> Edit</a><% } %>
-      <button type="button" class="<%= btn('confirm') %>" data-op-action="confirm">Mark as To Do</button>
-    <% } %>
-    <% if (op.status === 'waiting') { %>
-      <button type="button" class="<%= btn('confirm') %>" data-op-action="confirm">Check availability</button>
-    <% } %>
-    <% if (isDelivery && op.status === 'ready' && !op.pickedAt) { %>
-      <button type="button" class="<%= btn('pick') %>" data-op-action="pick">Mark as picked</button>
-    <% } %>
-    <% if (isDelivery && op.status === 'ready' && op.pickedAt && !op.packedAt) { %>
-      <button type="button" class="<%= btn('pack') %>" data-op-action="pack">Mark as packed</button>
-    <% } %>
-    <% if (canValidate) { %>
-      <button type="button" class="<%= primary === 'validate' ? 'btn btn-success' : 'btn btn-secondary' %>" data-op-action="validate"><%- icon('check', 'w-4 h-4') %> Validate</button>
-    <% } %>
-    <% if (['waiting', 'ready'].includes(op.status)) { %>
-      <button type="button" class="btn btn-secondary" data-op-action="reset" title="Back to draft to edit it">Back to draft</button>
-    <% } %>
-    <% if (isOpen) { %>
-      <button type="button" class="btn btn-danger" data-op-action="cancel">Cancel</button>
-    <% } %>
-    <% if (!isAdjustment) { %>
-      <button type="button" class="btn btn-secondary" data-op-action="duplicate" title="Create a new draft with the same products"><%- icon('copy', 'w-4 h-4') %> Duplicate</button>
-    <% } %>
-    <a href="/operations/<%= op._id %>/print" target="_blank" rel="noopener" class="btn btn-secondary"><%- icon('printer', 'w-4 h-4') %> Print</a>
-  </div>
-</div>
-
-<!-- Progress -->
-<% if (op.status === 'canceled') { %>
-  <div class="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
-    Canceled on <%= fmtDateTime(op.canceledAt) %>. No stock was changed.<% if (!isAdjustment) { %> Use <strong>Duplicate</strong> to start again.<% } %>
-  </div>
-<% } else { %>
-  <ol class="card p-4 flex items-center gap-2 overflow-x-auto" aria-label="Progress">
-    <% flow.forEach((step, i) => {
-         const state = i < currentIndex || op.status === 'done' ? 'complete' : i === currentIndex ? 'current' : 'upcoming';
-         const waiting = step === 'ready' && op.status === 'waiting'; %>
-      <li class="flex items-center gap-2 shrink-0" <%= state === 'current' ? 'aria-current=step' : '' %>>
-        <span class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold
-          <%= state === 'complete' ? 'bg-emerald-500/20 text-emerald-400' : state === 'current' ? (waiting ? 'bg-amber-500/20 text-amber-400 ring-2 ring-amber-500/40' : 'bg-blue-500/20 text-blue-300 ring-2 ring-blue-500/40') : 'bg-slate-800 text-slate-500' %>">
-          <%- state === 'complete' ? icon('check', 'w-4 h-4') : i + 1 %>
-        </span>
-        <span class="text-sm <%= state === 'upcoming' ? 'text-slate-500' : 'text-white font-medium' %>"><%= stepLabel(step) %></span>
-        <% if (i < flow.length - 1) { %><span class="w-8 sm:w-12 h-px <%= i < currentIndex ? 'bg-emerald-500/50' : 'bg-slate-700' %>"></span><% } %>
-      </li>
-    <% }) %>
-  </ol>
-<% } %>
-
-<!-- Shortages -->
-<% if (isOpen && isOutgoing && shortages.length > 0) { %>
-  <div class="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 space-y-3" role="status">
-    <div class="flex items-start gap-3 text-sm text-amber-200">
-      <%- icon('warning', 'w-5 h-5 shrink-0 text-amber-400') %>
-      <p>Not enough stock in <strong><%= op.sourceLocation.fullName %></strong> to process this <%= meta.label.toLowerCase() %>. It can be validated once stock arrives.</p>
+    <div class="flex flex-wrap gap-2" id="operationActions">
+      <% if (op.status === 'draft') { %>
+        <a href="/operations/<%= op._id %>/edit" class="btn btn-secondary"><%- icon('pencil', 'w-4 h-4') %> Edit</a>
+        <button type="button" class="<%= btn('confirm') %>" data-op-action="confirm"><%= isCount ? 'Submit for approval' : 'Mark as To Do' %></button>
+      <% } %>
+      <% if (op.status === 'waiting') { %>
+        <button type="button" class="<%= btn('confirm') %>" data-op-action="confirm">Check availability</button>
+      <% } %>
+      <% if (isDelivery && op.status === 'ready' && !op.pickedAt) { %>
+        <button type="button" class="<%= btn('pick') %>" data-op-action="pick">Mark as picked</button>
+      <% } %>
+      <% if (isDelivery && op.status === 'ready' && op.pickedAt && !op.packedAt) { %>
+        <button type="button" class="<%= btn('pack') %>" data-op-action="pack">Mark as packed</button>
+      <% } %>
+      <% if (canValidate) { %>
+        <button type="button" class="<%= primary === 'validate' || isCount ? 'btn btn-success' : 'btn btn-secondary' %>" data-op-action="validate"><%- icon('check', 'w-4 h-4') %> <%= isCount ? 'Apply count' : 'Validate' %></button>
+      <% } %>
+      <% if (['waiting', 'ready'].includes(op.status)) { %>
+        <button type="button" class="btn btn-secondary" data-op-action="reset" title="Back to draft to edit it">Back to draft</button>
+      <% } %>
+      <% if (isOpen) { %>
+        <button type="button" class="btn btn-danger" data-op-action="cancel">Cancel</button>
+      <% } %>
+      <% if (!isCount) { %>
+        <button type="button" class="btn btn-secondary" data-op-action="duplicate" title="Create a new draft with the same products"><%- icon('copy', 'w-4 h-4') %> Duplicate</button>
+      <% } %>
+      <a href="/operations/<%= op._id %>/print" target="_blank" rel="noopener" class="btn btn-secondary"><%- icon('printer', 'w-4 h-4') %> Print</a>
     </div>
-    <ul class="space-y-2 pl-8">
-      <% shortages.forEach((s) => { const missing = Math.round((s.required - s.available) * 1000) / 1000; %>
-        <li class="flex flex-wrap items-center gap-3 text-sm text-amber-100">
-          <span><strong><%= s.name %></strong> (<span class="font-mono"><%= s.sku %></span>): need <%= fmtQty(s.required) %>, have <%= fmtQty(s.available) %> - short <%= fmtQty(missing) %></span>
-          <a href="/receipts/new?product=<%= s.product %>&qty=<%= missing %>" class="btn btn-secondary btn-sm">Create receipt</a>
+  </div>
+
+  <% if (isCount && op.status === 'ready' && !isManager) { %>
+    <div class="rounded-xl border border-blue-500/30 bg-blue-500/10 p-4 text-sm text-blue-200">Submitted. An Inventory Manager will review the differences and apply the count.</div>
+  <% } %>
+
+  <!-- Progress -->
+  <% if (op.status === 'canceled') { %>
+    <div class="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
+      Canceled on <%= fmtDateTime(op.canceledAt) %>. No stock was changed.<% if (!isCount) { %> Use <strong>Duplicate</strong> to start again.<% } %>
+    </div>
+  <% } else { %>
+    <ol class="card p-4 flex items-center gap-2 overflow-x-auto" aria-label="Progress">
+      <% flow.forEach((step, i) => {
+           const state = i < currentIndex || op.status === 'done' ? 'complete' : i === currentIndex ? 'current' : 'upcoming';
+           const waiting = step === 'ready' && op.status === 'waiting'; %>
+        <li class="flex items-center gap-2 shrink-0" <%= state === 'current' ? 'aria-current=step' : '' %>>
+          <span class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold
+            <%= state === 'complete' ? 'bg-emerald-500/20 text-emerald-400' : state === 'current' ? (waiting ? 'bg-amber-500/20 text-amber-400 ring-2 ring-amber-500/40' : 'bg-blue-500/20 text-blue-300 ring-2 ring-blue-500/40') : 'bg-slate-800 text-slate-500' %>">
+            <%- state === 'complete' ? icon('check', 'w-4 h-4') : i + 1 %>
+          </span>
+          <span class="text-sm <%= state === 'upcoming' ? 'text-slate-500' : 'text-white font-medium' %>"><%= stepLabel(step) %></span>
+          <% if (i < flow.length - 1) { %><span class="w-8 sm:w-12 h-px <%= i < currentIndex ? 'bg-emerald-500/50' : 'bg-slate-700' %>"></span><% } %>
         </li>
       <% }) %>
-    </ul>
-  </div>
-<% } %>
+    </ol>
+  <% } %>
 
-<div class="grid lg:grid-cols-3 gap-6">
-  <!-- Details -->
-  <section class="card p-5 space-y-4 lg:col-span-1">
-    <h2 class="text-sm font-semibold text-white">Details</h2>
-    <dl class="space-y-3 text-sm">
-      <% if (op.type !== 'internal' || op.partner) { %>
-        <div><dt class="text-slate-500"><%= meta.partnerLabel %></dt><dd class="text-slate-200 font-medium"><%= op.partner || '—' %></dd></div>
-      <% } %>
-      <div><dt class="text-slate-500">From</dt><dd class="text-slate-200"><%= op.sourceLocation.fullName %></dd></div>
-      <div><dt class="text-slate-500">To</dt><dd class="text-slate-200"><%= op.destLocation.fullName %></dd></div>
-      <div><dt class="text-slate-500">Warehouse</dt><dd class="text-slate-200"><%= op.warehouse ? op.warehouse.name : '—' %></dd></div>
-      <div><dt class="text-slate-500">Scheduled</dt><dd class="<%= late ? 'text-red-400' : 'text-slate-200' %>"><%= fmtDate(op.scheduledDate) %></dd></div>
-      <div><dt class="text-slate-500">Created</dt><dd class="text-slate-200"><%= fmtDateTime(op.createdAt) %><%= op.createdBy ? ' by ' + op.createdBy.name : '' %></dd></div>
-      <% if (op.pickedAt) { %><div><dt class="text-slate-500">Picked</dt><dd class="text-slate-200"><%= fmtDateTime(op.pickedAt) %><%= op.pickedBy ? ' by ' + op.pickedBy.name : '' %></dd></div><% } %>
-      <% if (op.packedAt) { %><div><dt class="text-slate-500">Packed</dt><dd class="text-slate-200"><%= fmtDateTime(op.packedAt) %><%= op.packedBy ? ' by ' + op.packedBy.name : '' %></dd></div><% } %>
-      <% if (op.validatedAt) { %><div><dt class="text-slate-500">Validated</dt><dd class="text-emerald-400"><%= fmtDateTime(op.validatedAt) %><%= op.validatedBy ? ' by ' + op.validatedBy.name : '' %></dd></div><% } %>
-      <% if (op.notes) { %><div><dt class="text-slate-500">Notes</dt><dd class="text-slate-200 whitespace-pre-line"><%= op.notes %></dd></div><% } %>
-    </dl>
-  </section>
-
-  <!-- Lines -->
-  <section class="card overflow-hidden lg:col-span-2">
-    <h2 class="px-4 py-3 border-b border-slate-800 text-sm font-semibold text-white">Products</h2>
-    <div class="overflow-x-auto">
-      <table class="min-w-full">
-        <thead class="bg-slate-900/80">
-          <tr>
-            <th class="th">Product</th>
-            <th class="th text-right"><%= isAdjustment ? 'Counted' : 'Quantity' %></th>
-            <% if (isAdjustment && op.status === 'done') { %><th class="th text-right">Recorded before</th><% } %>
-            <% if (isOpen && isOutgoing) { %><th class="th text-right">Available at source</th><% } %>
-          </tr>
-        </thead>
-        <tbody>
-          <% op.lines.forEach((line) => { const p = line.product; const short = isOpen && isOutgoing && line.available < line.quantity; %>
-            <tr class="border-t border-slate-800">
-              <td class="td">
-                <a href="/products/<%= p._id %>" class="font-medium text-white hover:text-blue-300"><%= p.name %></a>
-                <div class="text-xs font-mono text-slate-500"><%= p.sku %></div>
-              </td>
-              <td class="td text-right tabular-nums font-semibold"><%= fmtQty(line.quantity) %> <span class="text-xs font-normal text-slate-500"><%= p.uom %></span></td>
-              <% if (isAdjustment && op.status === 'done') { %>
-                <td class="td text-right tabular-nums text-slate-400"><%= line.theoreticalQty === null || line.theoreticalQty === undefined ? '—' : fmtQty(line.theoreticalQty) %></td>
-              <% } %>
-              <% if (isOpen && isOutgoing) { %>
-                <td class="td text-right tabular-nums <%= short ? 'text-red-400 font-semibold' : 'text-emerald-400' %>"><%= fmtQty(line.available) %> <%= p.uom %><%= short ? ' ⚠' : '' %></td>
-              <% } %>
-            </tr>
-          <% }) %>
-        </tbody>
-      </table>
+  <!-- Shortages -->
+  <% if (isOpen && isOutgoing && shortages.length > 0) { %>
+    <div class="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 space-y-3" role="status">
+      <div class="flex items-start gap-3 text-sm text-amber-200">
+        <%- icon('warning', 'w-5 h-5 shrink-0 text-amber-400') %>
+        <p>Not enough stock in <strong><%= op.sourceLocation.fullName %></strong> to process this <%= meta.label.toLowerCase() %>. It can be validated once stock arrives.</p>
+      </div>
+      <ul class="space-y-2 pl-8">
+        <% shortages.forEach((s) => { const missing = Math.round((s.required - s.available) * 1000) / 1000; %>
+          <li class="flex flex-wrap items-center gap-3 text-sm text-amber-100">
+            <span><strong><%= s.name %></strong> (<span class="font-mono"><%= s.sku %></span>): need <%= fmtQty(s.required) %>, have <%= fmtQty(s.available) %> - short <%= fmtQty(missing) %></span>
+            <a href="/receipts/new?product=<%= s.product %>&qty=<%= missing %>" class="btn btn-secondary btn-sm">Create receipt</a>
+          </li>
+        <% }) %>
+      </ul>
     </div>
-  </section>
+  <% } %>
+
+  <div class="grid lg:grid-cols-3 gap-6">
+    <!-- Details -->
+    <section class="card p-5 space-y-4 lg:col-span-1">
+      <h2 class="text-sm font-semibold text-white">Details</h2>
+      <dl class="space-y-3 text-sm">
+        <% if (!isCount && (op.type !== 'internal' || op.partner)) { %>
+          <div><dt class="text-slate-500"><%= meta.partnerLabel %></dt><dd class="text-slate-200 font-medium"><%= op.partner || '—' %></dd></div>
+        <% } %>
+        <% if (isCount) { %>
+          <div><dt class="text-slate-500">Location counted</dt><dd class="text-slate-200"><a href="/locations/<%= op.sourceLocation._id %>" class="hover:text-blue-300"><%= op.sourceLocation.fullName %></a></dd></div>
+        <% } else { %>
+          <div><dt class="text-slate-500">From</dt><dd class="text-slate-200"><%= op.sourceLocation.fullName %></dd></div>
+          <div><dt class="text-slate-500">To</dt><dd class="text-slate-200"><%= op.destLocation.fullName %></dd></div>
+        <% } %>
+        <div><dt class="text-slate-500">Warehouse</dt><dd class="text-slate-200"><%= op.warehouse ? op.warehouse.name : '—' %></dd></div>
+        <div><dt class="text-slate-500"><%= isCount ? 'Count date' : 'Scheduled' %></dt><dd class="<%= late ? 'text-red-400' : 'text-slate-200' %>"><%= fmtDate(op.scheduledDate) %></dd></div>
+        <div><dt class="text-slate-500">Created</dt><dd class="text-slate-200"><%= fmtDateTime(op.createdAt) %><%= op.createdBy ? ' by ' + op.createdBy.name : '' %></dd></div>
+        <% if (op.pickedAt) { %><div><dt class="text-slate-500">Picked</dt><dd class="text-slate-200"><%= fmtDateTime(op.pickedAt) %><%= op.pickedBy ? ' by ' + op.pickedBy.name : '' %></dd></div><% } %>
+        <% if (op.packedAt) { %><div><dt class="text-slate-500">Packed</dt><dd class="text-slate-200"><%= fmtDateTime(op.packedAt) %><%= op.packedBy ? ' by ' + op.packedBy.name : '' %></dd></div><% } %>
+        <% if (op.validatedAt) { %><div><dt class="text-slate-500"><%= isCount ? 'Applied' : 'Validated' %></dt><dd class="text-emerald-400"><%= fmtDateTime(op.validatedAt) %><%= op.validatedBy ? ' by ' + op.validatedBy.name : '' %></dd></div><% } %>
+        <% if (op.notes) { %><div><dt class="text-slate-500">Notes</dt><dd class="text-slate-200 whitespace-pre-line"><%= op.notes %></dd></div><% } %>
+      </dl>
+    </section>
+
+    <!-- Lines -->
+    <section class="card overflow-hidden lg:col-span-2">
+      <h2 class="px-4 py-3 border-b border-slate-800 text-sm font-semibold text-white"><%= isCount ? 'Count sheet' : 'Products' %></h2>
+      <div class="overflow-x-auto">
+        <% if (isCount) { %>
+          <table class="min-w-full">
+            <thead class="bg-slate-900/80">
+              <tr>
+                <th class="th">Product</th>
+                <% if (!hideRecorded) { %><th class="th text-right"><%= isOpen ? 'Recorded' : 'Recorded before' %></th><% } %>
+                <th class="th text-right">Counted</th>
+                <% if (!hideRecorded) { %><th class="th text-right">Difference</th><th class="th text-right">Value</th><% } %>
+                <th class="th">Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% countRows.forEach(({ line, recorded, diff, value }) => { const p = line.product; const tone = diff > 0 ? 'text-emerald-400' : diff < 0 ? 'text-red-400' : 'text-slate-400'; %>
+                <tr class="border-t border-slate-800">
+                  <td class="td"><a href="/products/<%= p._id %>" class="font-medium text-white hover:text-blue-300"><%= p.name %></a><div class="text-xs font-mono text-slate-500"><%= p.sku %></div></td>
+                  <% if (!hideRecorded) { %><td class="td text-right tabular-nums text-slate-400"><%= recorded === null || recorded === undefined ? '—' : fmtQty(recorded) %></td><% } %>
+                  <td class="td text-right tabular-nums font-semibold"><%= fmtQty(line.quantity) %> <span class="text-xs font-normal text-slate-500"><%= p.uom %></span><% if (line.scannedQty) { %><div class="text-[11px] font-normal text-slate-500"><%= fmtQty(line.scannedQty) %> by scan</div><% } %></td>
+                  <% if (!hideRecorded) { %>
+                    <td class="td text-right tabular-nums font-semibold <%= tone %>"><%= diff === null ? '—' : diff === 0 ? '0' : (diff > 0 ? '+' : '') + fmtQty(diff) %></td>
+                    <td class="td text-right tabular-nums whitespace-nowrap <%= tone %>"><%= value ? fmtMoney(value) : '—' %></td>
+                  <% } %>
+                  <td class="td text-slate-300"><%= REASON_META[line.reason || 'count'] %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+            <% if (!hideRecorded) { %>
+              <tfoot><tr class="border-t border-slate-700"><td class="td text-right text-slate-400" colspan="4">Net difference value</td><td class="td text-right font-semibold tabular-nums <%= netValue < 0 ? 'text-red-400' : netValue > 0 ? 'text-emerald-400' : 'text-slate-300' %>"><%= fmtMoney(netValue) %></td><td class="td"></td></tr></tfoot>
+            <% } %>
+          </table>
+        <% } else { %>
+          <table class="min-w-full">
+            <thead class="bg-slate-900/80">
+              <tr>
+                <th class="th">Product</th>
+                <th class="th text-right">Quantity</th>
+                <% if (showProgress) { %><th class="th w-48"><%= op.type === 'receipt' ? 'Checked in' : 'Picked' %></th><% } %>
+                <% if (isOpen && isOutgoing) { %><th class="th text-right">Available at source</th><% } %>
+              </tr>
+            </thead>
+            <tbody>
+              <% op.lines.forEach((line) => { const p = line.product; const short = isOpen && isOutgoing && line.available < line.quantity; const pct = Math.min(100, Math.round(((line.scannedQty || 0) / line.quantity) * 100)); %>
+                <tr class="border-t border-slate-800" data-line-product="<%= p._id %>">
+                  <td class="td">
+                    <a href="/products/<%= p._id %>" class="font-medium text-white hover:text-blue-300"><%= p.name %></a>
+                    <div class="text-xs font-mono text-slate-500"><%= p.sku %></div>
+                  </td>
+                  <td class="td text-right tabular-nums font-semibold"><%= fmtQty(line.quantity) %> <span class="text-xs font-normal text-slate-500"><%= p.uom %></span></td>
+                  <% if (showProgress) { %>
+                    <td class="td">
+                      <div class="flex items-center gap-2">
+                        <div class="flex-1 h-2 rounded-full bg-slate-800 overflow-hidden"><div class="h-full <%= pct >= 100 ? 'bg-emerald-500' : 'bg-blue-500' %> transition-all" style="width: <%= pct %>%"></div></div>
+                        <span class="text-xs tabular-nums <%= pct >= 100 ? 'text-emerald-400' : 'text-slate-400' %>"><%= fmtQty(line.scannedQty || 0) %>/<%= fmtQty(line.quantity) %></span>
+                      </div>
+                    </td>
+                  <% } %>
+                  <% if (isOpen && isOutgoing) { %>
+                    <td class="td text-right tabular-nums <%= short ? 'text-red-400 font-semibold' : 'text-emerald-400' %>"><%= fmtQty(line.available) %> <%= p.uom %><%= short ? ' ⚠' : '' %></td>
+                  <% } %>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        <% } %>
+      </div>
+    </section>
+  </div>
+
+  <% if (moves.length > 0) { %>
+    <section class="card overflow-hidden">
+      <h2 class="px-4 py-3 border-b border-slate-800 text-sm font-semibold text-white">Stock moves (ledger)</h2>
+      <div class="overflow-x-auto">
+        <table class="min-w-full">
+          <thead class="bg-slate-900/80"><tr><th class="th">Product</th><th class="th">From</th><th class="th">To</th><th class="th text-right">Quantity</th><th class="th">Date</th></tr></thead>
+          <tbody>
+            <% moves.forEach((m) => { %>
+              <tr class="border-t border-slate-800">
+                <td class="td"><%= m.product ? m.product.name : '—' %></td>
+                <td class="td text-slate-300"><%= m.fromLocation.fullName %></td>
+                <td class="td text-slate-300"><%= m.toLocation.fullName %></td>
+                <td class="td text-right tabular-nums font-semibold"><%= fmtQty(m.quantity) %> <span class="text-xs font-normal text-slate-500"><%= m.product ? m.product.uom : '' %></span></td>
+                <td class="td text-slate-400 whitespace-nowrap"><%= fmtDateTime(m.date) %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  <% } %>
 </div>
 
-<% if (moves.length > 0) { %>
-  <section class="card overflow-hidden">
-    <h2 class="px-4 py-3 border-b border-slate-800 text-sm font-semibold text-white">Stock moves (ledger)</h2>
-    <div class="overflow-x-auto">
-      <table class="min-w-full">
-        <thead class="bg-slate-900/80"><tr><th class="th">Product</th><th class="th">From</th><th class="th">To</th><th class="th text-right">Quantity</th><th class="th">Date</th></tr></thead>
-        <tbody>
-          <% moves.forEach((m) => { %>
-            <tr class="border-t border-slate-800">
-              <td class="td"><%= m.product ? m.product.name : '—' %></td>
-              <td class="td text-slate-300"><%= m.fromLocation.fullName %></td>
-              <td class="td text-slate-300"><%= m.toLocation.fullName %></td>
-              <td class="td text-right tabular-nums font-semibold"><%= fmtQty(m.quantity) %> <span class="text-xs font-normal text-slate-500"><%= m.product ? m.product.uom : '' %></span></td>
-              <td class="td text-slate-400 whitespace-nowrap"><%= fmtDateTime(m.date) %></td>
-            </tr>
-          <% }) %>
-        </tbody>
-      </table>
-    </div>
-  </section>
-<% } %>
+<!-- Who else is here (Live Warehouse presence) -->
+<div id="presence" class="hidden flex flex-wrap items-center gap-2" aria-live="polite"></div>
 
+<!-- Scan & Pick (outside the live region so typing is never interrupted) -->
+<section id="scanPanel" class="card p-5 space-y-4 <%= canScan ? '' : 'hidden' %>" aria-label="Scan">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h2 class="text-sm font-semibold text-white flex items-center gap-2"><%- icon('scan', 'w-5 h-5 text-blue-400') %> <%= isCount ? 'Scan to count' : isDelivery ? 'Scan to pick' : 'Scan to check' %></h2>
+      <p class="text-xs text-slate-500">USB scanner, phone/laptop camera, or type a SKU and press Enter. Scan a location label to confirm you're at the right bin.</p>
+    </div>
+    <button type="button" id="cameraToggle" class="btn btn-secondary btn-sm"><%- icon('scan', 'w-4 h-4') %> Use camera</button>
+  </div>
+  <form id="scanForm" class="flex flex-col sm:flex-row gap-2" autocomplete="off">
+    <input id="scanInput" class="input font-mono flex-1" placeholder="Scan barcode or type SKU / location" aria-label="Barcode">
+    <input id="scanQty" type="number" min="0" step="any" value="1" class="input sm:w-28 tabular-nums" aria-label="Quantity per scan" title="Quantity per scan">
+    <button type="submit" class="btn btn-primary">Scan</button>
+  </form>
+  <div id="scanCamera" class="hidden rounded-xl overflow-hidden border border-slate-700 max-w-md"></div>
+  <ul id="scanLog" class="space-y-1 text-sm" aria-live="polite"></ul>
+</section>
+
+<script src="/js/scan.js"></script>
 <script>
   (() => {
     const { api, toast, toastAfterNavigation, confirmDialog, setBusy } = window.StockSense;
@@ -196,23 +282,23 @@
 
     const confirmations = {
       validate: {
-        title: `Validate ${reference}?`,
-        message: '<%= op.type === "receipt" ? "Stock will be added to the destination location." : op.type === "delivery" ? "Stock will be removed from the source location." : isAdjustment ? "Recorded stock will be set to the counted quantities." : "Stock will move between the two locations." %> This cannot be undone.',
-        confirmLabel: 'Validate',
+        title: <%- jsonForScript(isCount ? 'Apply ' + op.reference + '?' : 'Validate ' + op.reference + '?') %>,
+        message: <%- jsonForScript((op.type === 'receipt' ? 'Stock will be added to the destination location.' : op.type === 'delivery' ? 'Stock will be removed from the source location.' : isCount ? 'Recorded stock will be set to the counted quantities.' : 'Stock will move between the two locations.') + ' This cannot be undone.') %>,
+        confirmLabel: <%- jsonForScript(isCount ? 'Apply count' : 'Validate') %>,
       },
       cancel: {
         title: `Cancel ${reference}?`,
-        message: 'The operation will be closed without changing any stock. You can duplicate it later.',
+        message: 'The operation will be closed without changing any stock.',
         confirmLabel: 'Cancel operation',
         danger: true,
       },
     };
 
-    document.getElementById('operationActions').addEventListener('click', async (e) => {
+    // Delegated at document level: the live region re-renders these buttons
+    document.addEventListener('click', async (e) => {
       const button = e.target.closest('[data-op-action]');
       if (!button) return;
       const action = button.dataset.opAction;
-
       if (confirmations[action] && !(await confirmDialog(confirmations[action]))) return;
 
       setBusy(button, true);
@@ -223,7 +309,6 @@
         toastAfterNavigation(res.message, tone);
         window.location.href = target;
       } catch (err) {
-        // A refused validation parks the operation as "waiting": reload to show the shortages
         if (action === 'validate' && err.details && err.details.shortages) {
           toastAfterNavigation(err.message, 'error');
           window.location.reload();
@@ -232,6 +317,31 @@
         toast(err.message, 'error', 8000);
         setBusy(button, false);
       }
+    });
+
+    // Scan & Pick
+    const scanPanel = document.getElementById('scanPanel');
+    const scanner = window.StockSenseScanner.attach({
+      form: document.getElementById('scanForm'),
+      input: document.getElementById('scanInput'),
+      quantity: document.getElementById('scanQty'),
+      log: document.getElementById('scanLog'),
+      cameraButton: document.getElementById('cameraToggle'),
+      cameraBox: document.getElementById('scanCamera'),
+      onCode: async (code, quantity) => {
+        const res = await api('POST', `/api/operations/${id}/scan`, { code, quantity });
+        // (the live stream also refreshes the page; this makes our own scans instant)
+        if (window.StockSense.live) window.StockSense.live.refreshRegions();
+        return { ok: true, message: res.message, done: res.data.complete };
+      },
+    });
+
+    // Hide the scanner when someone else moves the operation on
+    document.addEventListener('stocksense:regions-updated', () => {
+      const region = document.querySelector('[data-can-scan]');
+      const can = region && region.dataset.canScan === 'true';
+      scanPanel.classList.toggle('hidden', !can);
+      if (!can) scanner.stopCamera();
     });
   })();
 </script>

@@ -87,7 +87,7 @@ const getOperationDetail = async (id) => {
   const operation = await Operation.findById(id)
     .populate('sourceLocation destLocation', 'fullName type')
     .populate('warehouse', 'name code address')
-    .populate('lines.product', 'name sku uom isActive')
+    .populate('lines.product', 'name sku uom isActive unitCost')
     .populate('createdBy validatedBy pickedBy packedBy', 'name role')
     .lean();
   if (!operation) {
@@ -106,6 +106,14 @@ const getOperationDetail = async (id) => {
       type: operation.type,
       sourceLocation: operation.sourceLocation._id,
       lines: operation.lines.map((l) => ({ product: l.product._id, quantity: l.quantity })),
+    });
+  }
+
+  // Open counts: what the system records at the counted location right now
+  if (operation.type === 'adjustment' && OPEN_STATUSES.includes(operation.status)) {
+    const recorded = await stock.getAvailableAt(operation.sourceLocation._id, operation.lines.map((l) => l.product._id));
+    operation.lines.forEach((line) => {
+      line.recorded = recorded.get(line.product._id.toString()) || 0;
     });
   }
 
