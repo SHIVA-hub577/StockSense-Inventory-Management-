@@ -1,47 +1,45 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
 /**
- * Send email using Nodemailer and Gmail App Password
+ * Send email using Resend API
  * @param {Object} options - { to, subject, html, text }
  */
 const sendEmail = async (options) => {
-  const googleUser = process.env.GOOGLEUSER;
-  const rawPass = process.env.GMAIL_APP_PASSWORD || '';
-  // Clean up any spaces from 16-letter App Password if pasted with spaces
-  const appPassword = rawPass.replace(/\s+/g, '');
+  const apiKey = process.env.RESEND_API_KEY;
 
-  if (!googleUser || !appPassword) {
-    // Local development without Gmail: print the email (incl. OTP) to the console instead
+  if (!apiKey) {
+    // Local development without Resend API key: print the email (incl. OTP) to the console instead
     if (process.env.NODE_ENV !== 'production') {
-      const text = options.text || options.html.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
-      console.log(`\n[Email Dev Fallback] Gmail not configured - email NOT sent.`);
+      const text = options.text || (options.html ? options.html.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim() : '');
+      console.log(`\n[Email Dev Fallback] RESEND_API_KEY not configured - email NOT sent.`);
       console.log(`  To      : ${options.to}`);
       console.log(`  Subject : ${options.subject}`);
       console.log(`  Body    : ${text}\n`);
-      return { messageId: 'dev-console-fallback' };
+      return { id: 'dev-console-fallback' };
     }
-    throw new Error('Gmail credentials (GOOGLEUSER / GMAIL_APP_PASSWORD) are not set in environment variables');
+    throw new Error('RESEND_API_KEY is not set in environment variables');
   }
 
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: googleUser,
-      pass: appPassword,
-    },
-  });
+  const resend = new Resend(apiKey);
+  const fromEmail = process.env.EMAIL_FROM || process.env.RESEND_FROM_EMAIL || 'StockSense <onboarding@resend.dev>';
 
-  const mailOptions = {
-    from: `"StockSense Support" <${googleUser}>`,
+  const payload = {
+    from: fromEmail,
     to: options.to,
     subject: options.subject,
-    text: options.text || options.html.replace(/<[^>]*>?/gm, ''), // Plain text fallback
     html: options.html,
+    text: options.text || (options.html ? options.html.replace(/<[^>]*>?/gm, '') : ''),
   };
 
-  const info = await transporter.sendMail(mailOptions);
-  console.log(`[Email Sent] Message ID: ${info.messageId} to ${options.to}`);
-  return info;
+  const { data, error } = await resend.emails.send(payload);
+
+  if (error) {
+    console.error(`[Email Error] Failed to send email via Resend:`, error);
+    throw new Error(error.message || 'Failed to send email via Resend');
+  }
+
+  console.log(`[Email Sent] Message ID: ${data?.id || 'sent'} to ${options.to}`);
+  return data;
 };
 
 module.exports = sendEmail;
