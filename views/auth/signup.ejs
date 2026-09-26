@@ -1,0 +1,260 @@
+<%- include('../layout/header') %>
+
+<main class="flex-grow flex items-center justify-center p-4 py-8">
+  <div class="w-full max-w-lg glass-card rounded-2xl shadow-2xl p-8 space-y-6 border border-slate-800">
+    <div class="text-center space-y-2">
+      <div class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-600/20 text-blue-400 mb-2 ring-1 ring-blue-500/30">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+        </svg>
+      </div>
+      <h1 class="text-2xl font-bold tracking-tight text-white">Create StockSense Account</h1>
+      <p class="text-sm text-slate-400">Single signup system with email OTP verification</p>
+    </div>
+
+    <!-- Alert Box -->
+    <div id="alertBox" class="<%= error ? '' : 'hidden' %> p-4 rounded-xl text-sm font-medium bg-red-500/10 text-red-400 border border-red-500/20 transition-all">
+      <%= error %>
+    </div>
+
+    <form id="signupForm" class="space-y-4">
+      <div>
+        <label for="name" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1">Full Name *</label>
+        <input 
+          type="text" 
+          id="name" 
+          name="name" 
+          required 
+          placeholder="John Doe"
+          class="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+        />
+      </div>
+
+      <div>
+        <label for="email" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1">Email Address *</label>
+        <input 
+          type="email" 
+          id="email" 
+          name="email" 
+          required 
+          placeholder="name@company.com"
+          class="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+        />
+      </div>
+
+      <!-- Role Selection Cards -->
+      <div>
+        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">Select User Role *</label>
+        <div class="grid grid-cols-2 gap-3">
+          <label class="role-card relative flex flex-col p-4 rounded-xl border-2 border-slate-700 bg-slate-900/80 cursor-pointer hover:border-blue-500/50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-600/10 has-[:checked]:shadow-lg has-[:checked]:shadow-blue-500/10 transition-all text-left group">
+            <input type="radio" name="role" value="manager" checked class="sr-only" />
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-sm font-bold text-white group-has-[:checked]:text-blue-400">Inventory Manager</span>
+              <div class="w-5 h-5 rounded-full border-2 border-slate-600 group-has-[:checked]:border-blue-500 group-has-[:checked]:bg-blue-500 flex items-center justify-center transition-all">
+                <svg class="w-3.5 h-3.5 text-white hidden group-has-[:checked]:block" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                </svg>
+              </div>
+            </div>
+            <p class="text-xs text-slate-400 group-has-[:checked]:text-slate-300">Catalogs, stock decisions, KPI reports & settings approval.</p>
+          </label>
+
+          <label class="role-card relative flex flex-col p-4 rounded-xl border-2 border-slate-700 bg-slate-900/80 cursor-pointer hover:border-blue-500/50 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-600/10 has-[:checked]:shadow-lg has-[:checked]:shadow-blue-500/10 transition-all text-left group">
+            <input type="radio" name="role" value="staff" class="sr-only" />
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-sm font-bold text-white group-has-[:checked]:text-blue-400">Warehouse Staff</span>
+              <div class="w-5 h-5 rounded-full border-2 border-slate-600 group-has-[:checked]:border-blue-500 group-has-[:checked]:bg-blue-500 flex items-center justify-center transition-all">
+                <svg class="w-3.5 h-3.5 text-white hidden group-has-[:checked]:block" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                </svg>
+              </div>
+            </div>
+            <p class="text-xs text-slate-400 group-has-[:checked]:text-slate-300">Hands-on receiving, picking, internal transfers & stock count.</p>
+          </label>
+        </div>
+      </div>
+
+      <div>
+        <label for="password" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1">Password (min 6 chars) *</label>
+        <input 
+          type="password" 
+          id="password" 
+          name="password" 
+          required 
+          minlength="6"
+          placeholder="••••••••"
+          class="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+        />
+      </div>
+
+      <div>
+        <label for="phone" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1">Phone Number (Optional)</label>
+        <input 
+          type="tel" 
+          id="phone" 
+          name="phone" 
+          placeholder="+91 1234567890"
+          class="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+        />
+      </div>
+
+      <!-- Step 2: OTP Verification Container (Hidden initially) -->
+      <div id="otpContainer" class="hidden space-y-2 pt-2 border-t border-slate-800">
+        <label for="otp" class="block text-xs font-semibold uppercase tracking-wider text-blue-400">Enter 6-Digit Email Verification OTP *</label>
+        <div class="flex space-x-2">
+          <input 
+            type="text" 
+            id="otp" 
+            name="otp" 
+            maxlength="6"
+            placeholder="123456"
+            class="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-blue-500/50 text-white placeholder-slate-600 tracking-[0.5em] text-lg font-mono text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <p class="text-[11px] text-slate-400">Check your email inbox for the 6-digit verification code.</p>
+      </div>
+
+      <!-- Step 1 Button: Send OTP -->
+      <button 
+        type="button" 
+        id="sendOtpBtn"
+        class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold text-sm hover:from-blue-500 hover:to-indigo-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-lg shadow-blue-600/25"
+      >
+        Send Verification OTP
+      </button>
+
+      <!-- Step 2 Button: Complete Registration (Hidden initially) -->
+      <button 
+        type="submit" 
+        id="submitBtn"
+        class="hidden w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-semibold text-sm hover:from-emerald-500 hover:to-teal-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all shadow-lg shadow-emerald-600/25"
+      >
+        Verify OTP & Create Account
+      </button>
+    </form>
+
+    <div class="text-center pt-2 border-t border-slate-800/60">
+      <p class="text-xs text-slate-400">
+        Already have an account? 
+        <a href="/auth/login" class="font-medium text-blue-400 hover:text-blue-300 transition-colors">Sign In</a>
+      </p>
+    </div>
+  </div>
+</main>
+
+<script>
+  const sendOtpBtn = document.getElementById('sendOtpBtn');
+  const submitBtn = document.getElementById('submitBtn');
+  const otpContainer = document.getElementById('otpContainer');
+  const alertBox = document.getElementById('alertBox');
+  const emailInput = document.getElementById('email');
+
+  // Step 1: Send OTP handler
+  sendOtpBtn.addEventListener('click', async () => {
+    alertBox.classList.add('hidden');
+    const email = emailInput.value.trim();
+
+    if (!email) {
+      alertBox.className = 'p-4 rounded-xl text-sm font-medium bg-red-500/10 text-red-400 border border-red-500/20';
+      alertBox.innerText = 'Please enter your email address first.';
+      alertBox.classList.remove('hidden');
+      return;
+    }
+
+    sendOtpBtn.disabled = true;
+    sendOtpBtn.innerText = 'Sending OTP to email...';
+
+    try {
+      const res = await fetch('/auth/send-signup-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        alertBox.className = 'p-4 rounded-xl text-sm font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+        alertBox.innerText = data.message;
+        alertBox.classList.remove('hidden');
+
+        // Reveal OTP container & Verify button
+        otpContainer.classList.remove('hidden');
+        submitBtn.classList.remove('hidden');
+        sendOtpBtn.classList.add('hidden');
+        emailInput.readOnly = true;
+      } else {
+        alertBox.className = 'p-4 rounded-xl text-sm font-medium bg-red-500/10 text-red-400 border border-red-500/20';
+        alertBox.innerText = data.message || 'Failed to send OTP.';
+        alertBox.classList.remove('hidden');
+        sendOtpBtn.disabled = false;
+        sendOtpBtn.innerText = 'Send Verification OTP';
+      }
+    } catch (err) {
+      alertBox.className = 'p-4 rounded-xl text-sm font-medium bg-red-500/10 text-red-400 border border-red-500/20';
+      alertBox.innerText = 'Network error. Please try again.';
+      alertBox.classList.remove('hidden');
+      sendOtpBtn.disabled = false;
+      sendOtpBtn.innerText = 'Send Verification OTP';
+    }
+  });
+
+  // Step 2: Complete Registration handler
+  document.getElementById('signupForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    alertBox.classList.add('hidden');
+    submitBtn.disabled = true;
+    submitBtn.innerText = 'Verifying OTP & Creating Account...';
+
+    const name = document.getElementById('name').value.trim();
+    const email = emailInput.value.trim();
+    const password = document.getElementById('password').value;
+    const phone = document.getElementById('phone').value.trim();
+    const otp = document.getElementById('otp').value.trim();
+    const roleInput = document.querySelector('input[name="role"]:checked');
+    const role = roleInput ? roleInput.value : 'staff';
+
+    if (!otp || otp.length < 6) {
+      alertBox.className = 'p-4 rounded-xl text-sm font-medium bg-red-500/10 text-red-400 border border-red-500/20';
+      alertBox.innerText = 'Please enter the 6-digit OTP code received in your email.';
+      alertBox.classList.remove('hidden');
+      submitBtn.disabled = false;
+      submitBtn.innerText = 'Verify OTP & Create Account';
+      return;
+    }
+
+    try {
+      const res = await fetch('/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password, role, phone, otp }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        alertBox.className = 'p-4 rounded-xl text-sm font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+        alertBox.innerText = 'OTP verified! Account created successfully. Redirecting...';
+        alertBox.classList.remove('hidden');
+        setTimeout(() => {
+          window.location.href = '/dashboard';
+        }, 1000);
+      } else {
+        alertBox.className = 'p-4 rounded-xl text-sm font-medium bg-red-500/10 text-red-400 border border-red-500/20';
+        alertBox.innerText = data.message || 'OTP is invalid or expired. Cannot create account.';
+        alertBox.classList.remove('hidden');
+        submitBtn.disabled = false;
+        submitBtn.innerText = 'Verify OTP & Create Account';
+      }
+    } catch (err) {
+      alertBox.className = 'p-4 rounded-xl text-sm font-medium bg-red-500/10 text-red-400 border border-red-500/20';
+      alertBox.innerText = 'Network error. Please try again.';
+      alertBox.classList.remove('hidden');
+      submitBtn.disabled = false;
+      submitBtn.innerText = 'Verify OTP & Create Account';
+    }
+  });
+</script>
+
+<%- include('../layout/footer') %>

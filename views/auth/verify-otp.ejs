@@ -1,0 +1,97 @@
+<%- include('../layout/header') %>
+
+<main class="flex-grow flex items-center justify-center p-4">
+  <div class="w-full max-w-md glass-card rounded-2xl shadow-2xl p-8 space-y-6 border border-slate-800">
+    <div class="text-center space-y-2">
+      <div class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-purple-600/20 text-purple-400 mb-2 ring-1 ring-purple-500/30">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+      </div>
+      <h1 class="text-2xl font-bold tracking-tight text-white">Enter OTP Code</h1>
+      <p class="text-sm text-slate-400">Enter the 6-digit OTP sent to <span id="displayEmail" class="text-blue-400 font-semibold"><%= email || 'your email' %></span></p>
+    </div>
+
+    <div id="alertBox" class="<%= error ? '' : 'hidden' %> p-4 rounded-xl text-sm font-medium bg-red-500/10 text-red-400 border border-red-500/20">
+      <%= error %>
+    </div>
+
+    <form id="verifyForm" class="space-y-4">
+      <input type="hidden" id="email" name="email" value="<%= email %>" />
+
+      <div>
+        <label for="otp" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1 text-center">6-Digit OTP</label>
+        <input 
+          type="text" 
+          id="otp" 
+          name="otp" 
+          required 
+          maxlength="6"
+          placeholder="123456"
+          class="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700 text-white placeholder-slate-600 text-center tracking-[0.5em] text-xl font-mono focus:outline-none focus:ring-2 focus:ring-purple-500"
+        />
+      </div>
+
+      <button 
+        type="submit" 
+        id="submitBtn"
+        class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold text-sm hover:from-purple-500 hover:to-indigo-500 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all shadow-lg shadow-purple-600/25"
+      >
+        Verify OTP
+      </button>
+    </form>
+
+    <div class="text-center pt-2 border-t border-slate-800/60 flex justify-between items-center text-xs">
+      <a href="/auth/forgot-password" class="text-slate-400 hover:text-white transition-colors">Resend OTP</a>
+      <a href="/auth/login" class="text-slate-400 hover:text-white transition-colors">Back to Login</a>
+    </div>
+  </div>
+</main>
+
+<script>
+  document.getElementById('verifyForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const alertBox = document.getElementById('alertBox');
+    const submitBtn = document.getElementById('submitBtn');
+
+    alertBox.classList.add('hidden');
+    submitBtn.disabled = true;
+    submitBtn.innerText = 'Verifying...';
+
+    const email = document.getElementById('email').value.trim();
+    const otp = document.getElementById('otp').value.trim();
+
+    try {
+      const res = await fetch('/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        alertBox.className = 'p-4 rounded-xl text-sm font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+        alertBox.innerText = data.message + ' Redirecting to password reset...';
+        alertBox.classList.remove('hidden');
+        setTimeout(() => {
+          window.location.href = `/auth/reset-password?email=${encodeURIComponent(email)}`;
+        }, 1000);
+      } else {
+        alertBox.className = 'p-4 rounded-xl text-sm font-medium bg-red-500/10 text-red-400 border border-red-500/20';
+        alertBox.innerText = data.message || 'Verification failed. Please check the OTP code.';
+        alertBox.classList.remove('hidden');
+        submitBtn.disabled = false;
+        submitBtn.innerText = 'Verify OTP';
+      }
+    } catch (err) {
+      alertBox.className = 'p-4 rounded-xl text-sm font-medium bg-red-500/10 text-red-400 border border-red-500/20';
+      alertBox.innerText = 'Network error. Please try again.';
+      alertBox.classList.remove('hidden');
+      submitBtn.disabled = false;
+      submitBtn.innerText = 'Verify OTP';
+    }
+  });
+</script>
+
+<%- include('../layout/footer') %>

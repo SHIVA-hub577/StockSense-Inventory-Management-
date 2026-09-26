@@ -1,0 +1,112 @@
+<%- include('../layout/header') %>
+
+<main class="flex-grow flex items-center justify-center p-4">
+  <div class="w-full max-w-md glass-card rounded-2xl shadow-2xl p-8 space-y-6 border border-slate-800">
+    <div class="text-center space-y-2">
+      <div class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-600/20 text-blue-400 mb-2 ring-1 ring-blue-500/30">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+        </svg>
+      </div>
+      <h1 class="text-2xl font-bold tracking-tight text-white">Welcome back</h1>
+      <p class="text-sm text-slate-400">Sign in to your StockSense account</p>
+    </div>
+
+    <!-- Alert Box -->
+    <div id="alertBox" class="<%= error || success ? '' : 'hidden' %> p-4 rounded-xl text-sm font-medium transition-all duration-200 <%= error ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' %>">
+      <%= error || success %>
+    </div>
+
+    <form id="loginForm" class="space-y-4">
+      <div>
+        <label for="email" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1">Email Address</label>
+        <input 
+          type="email" 
+          id="email" 
+          name="email" 
+          required 
+          placeholder="name@company.com"
+          class="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition-all"
+        />
+      </div>
+
+      <div>
+        <div class="flex justify-between items-center mb-1">
+          <label for="password" class="text-xs font-semibold uppercase tracking-wider text-slate-300">Password</label>
+          <a href="/auth/forgot-password" class="text-xs text-blue-400 hover:text-blue-300 transition-colors">Forgot Password?</a>
+        </div>
+        <input 
+          type="password" 
+          id="password" 
+          name="password" 
+          required 
+          placeholder="••••••••"
+          class="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition-all"
+        />
+      </div>
+
+      <button 
+        type="submit" 
+        id="submitBtn"
+        class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold text-sm hover:from-blue-500 hover:to-indigo-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-950 transition-all shadow-lg shadow-blue-600/25"
+      >
+        Sign In
+      </button>
+    </form>
+
+    <div class="text-center pt-2 border-t border-slate-800/60">
+      <p class="text-xs text-slate-400">
+        Don't have an account? 
+        <a href="/auth/signup" class="font-medium text-blue-400 hover:text-blue-300 transition-colors">Create Account</a>
+      </p>
+    </div>
+  </div>
+</main>
+
+<script>
+  document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const alertBox = document.getElementById('alertBox');
+    const submitBtn = document.getElementById('submitBtn');
+    
+    alertBox.classList.add('hidden');
+    submitBtn.disabled = true;
+    submitBtn.innerText = 'Signing in...';
+
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+
+    try {
+      const res = await fetch('/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        alertBox.className = 'p-4 rounded-xl text-sm font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+        alertBox.innerText = 'Login successful! Redirecting to dashboard...';
+        alertBox.classList.remove('hidden');
+        setTimeout(() => {
+          window.location.href = '/dashboard';
+        }, 800);
+      } else {
+        alertBox.className = 'p-4 rounded-xl text-sm font-medium bg-red-500/10 text-red-400 border border-red-500/20';
+        alertBox.innerText = data.message || 'Login failed. Please check your credentials.';
+        alertBox.classList.remove('hidden');
+        submitBtn.disabled = false;
+        submitBtn.innerText = 'Sign In';
+      }
+    } catch (err) {
+      alertBox.className = 'p-4 rounded-xl text-sm font-medium bg-red-500/10 text-red-400 border border-red-500/20';
+      alertBox.innerText = 'Network error. Please try again.';
+      alertBox.classList.remove('hidden');
+      submitBtn.disabled = false;
+      submitBtn.innerText = 'Sign In';
+    }
+  });
+</script>
+
+<%- include('../layout/footer') %>
