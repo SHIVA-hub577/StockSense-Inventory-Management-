@@ -1145,7 +1145,7 @@
   }
   .iso .iso-label {
     font-family: var(--font-mono);
-    font-size: 9.5px;
+    font-size: 8.5px;
     font-weight: 600;
     fill: var(--ink-2);
     pointer-events: none;

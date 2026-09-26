@@ -6,22 +6,25 @@
   const locs = w.locations.filter((l) => l.isActive);
   const TW = 76; // tile width
   const TH = TW / 2; // tile height
-  const MAXH = 62; // tallest stack
+  const MAXH = 44; // tallest stack
   const cols = Math.max(1, Math.ceil(Math.sqrt(locs.length)));
   const rowsN = Math.max(1, Math.ceil(locs.length / cols));
   const maxValue = Math.max(1, ...locs.map((l) => l.value || 0));
   const pad = 18;
-  const minX = -rowsN * TW / 2 - pad;
-  const maxX = cols * TW / 2 + pad;
-  const minY = -MAXH - pad - 14;
-  const maxY = (cols + rowsN) * TH / 2 + pad;
+  let minX = -rowsN * TW / 2 - pad;
+  let maxX = cols * TW / 2 + pad;
+  let minY = -MAXH - pad;
+  let maxY = (cols + rowsN) * TH / 2 + pad + 16;
+  // Small floors keep a sensible scale instead of filling the whole card
+  if (maxX - minX < 290) { const cx = (minX + maxX) / 2; minX = cx - 145; maxX = cx + 145; }
+  if (maxY - minY < 150) { const cy = (minY + maxY) / 2; minY = cy - 75; maxY = cy + 75; }
   const pt = (x, y) => `${x.toFixed(1)},${y.toFixed(1)}`;
   const cells = locs.map((l, i) => {
     const col = i % cols;
     const row = Math.floor(i / cols);
     const x = (col - row) * TW / 2;
     const y = (col + row) * TH / 2;
-    const h = l.value > 0 ? 8 + (l.value / maxValue) * (MAXH - 8) : l.products > 0 ? 8 : 3;
+    const h = l.value > 0 ? 10 + (l.value / maxValue) * (MAXH - 10) : l.products > 0 ? 10 : 3;
     return { l, col, row, x, y, h };
   }).sort((a, b) => a.col + a.row - (b.col + b.row));
   // Floor diamond covering the whole grid
@@ -35,7 +38,7 @@
 <% } else { %>
   <svg class="iso w-full h-auto max-h-[22rem]" viewBox="<%= minX.toFixed(0) %> <%= minY.toFixed(0) %> <%= (maxX - minX).toFixed(0) %> <%= (maxY - minY).toFixed(0) %>" role="group" aria-label="Floor plan of <%= w.name %>: <%= locs.length %> locations, taller stacks hold more stock value">
     <polygon class="iso-floor" points="<%= fTop %> <%= fRight %> <%= fBottom %> <%= fLeft %>"/>
-    <% cells.forEach(({ l, x, y, h }) => { const empty = !(l.products > 0); const short = l.name || l.fullName.split('/').pop(); %>
+    <% cells.forEach(({ l, x, y, h }) => { const empty = !(l.products > 0); %>
       <a href="/locations/<%= l._id %>" class="iso-cell <%= empty ? 'is-empty' : '' %>" aria-label="<%= l.fullName %>: <%= l.products %> products, <%= fmtMoney(l.value || 0) %>">
         <title><%= l.fullName %> · <%= l.products %> product<%= l.products === 1 ? '' : 's' %> · <%= fmtMoney(l.value || 0) %></title>
         <g class="iso-stack" style="--h: <%= h.toFixed(1) %>px">
@@ -44,9 +47,12 @@
           <polygon class="iso-right" points="<%= pt(x + TW / 2 - 6, y + TH / 2 - h) %> <%= pt(x, y + TH - 3 - h) %> <%= pt(x, y + TH - 3) %> <%= pt(x + TW / 2 - 6, y + TH / 2) %>"/>
           <polygon class="iso-top" points="<%= pt(x, y + 3 - h) %> <%= pt(x + TW / 2 - 6, y + TH / 2 - h) %> <%= pt(x, y + TH - 3 - h) %> <%= pt(x - TW / 2 + 6, y + TH / 2 - h) %>"/>
           <% if (!empty) { %><path class="iso-tape" d="M<%= pt(x - TW / 4 + 3, y + TH / 4 + 1.5 - h) %> L<%= pt(x + TW / 4 - 3, y + TH * 3 / 4 - 1.5 - h) %>"/><% } %>
-          <text class="iso-label" x="<%= x.toFixed(1) %>" y="<%= (y - h - 6).toFixed(1) %>" text-anchor="middle"><%= short.length > 10 ? short.slice(0, 9) + '…' : short %></text>
         </g>
       </a>
+    <% }) %>
+    <%# Names go on the floor in front of each tile, drawn last so stacks never cover them %>
+    <% cells.forEach(({ l, x, y }) => { const short = l.name || l.fullName.split('/').pop(); %>
+      <text class="iso-label" x="<%= x.toFixed(1) %>" y="<%= (y + TH + 11).toFixed(1) %>" text-anchor="middle"><%= short.length > 9 ? short.slice(0, 8) + '…' : short %></text>
     <% }) %>
   </svg>
 <% } %>
