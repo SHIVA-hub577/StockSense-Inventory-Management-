@@ -11,6 +11,15 @@ const sendEmail = async (options) => {
   const appPassword = rawPass.replace(/\s+/g, '');
 
   if (!googleUser || !appPassword) {
+    // Local development without Gmail: print the email (incl. OTP) to the console instead
+    if (process.env.NODE_ENV !== 'production') {
+      const text = options.text || options.html.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
+      console.log(`\n[Email Dev Fallback] Gmail not configured - email NOT sent.`);
+      console.log(`  To      : ${options.to}`);
+      console.log(`  Subject : ${options.subject}`);
+      console.log(`  Body    : ${text}\n`);
+      return { messageId: 'dev-console-fallback' };
+    }
     throw new Error('Gmail credentials (GOOGLEUSER / GMAIL_APP_PASSWORD) are not set in environment variables');
   }
 

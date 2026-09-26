@@ -74,6 +74,8 @@
         alertBox.className = 'p-4 rounded-xl text-sm font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
         alertBox.innerText = data.message + ' Redirecting to password reset...';
         alertBox.classList.remove('hidden');
+        // Reset endpoint re-validates the OTP, so carry it to the next page (not in the URL)
+        try { sessionStorage.setItem('resetOtp', otp); } catch (e) {}
         setTimeout(() => {
           window.location.href = `/auth/reset-password?email=${encodeURIComponent(email)}`;
         }, 1000);

@@ -385,12 +385,12 @@ const verifyOtp = async (req, res, next) => {
  */
 const resetPassword = async (req, res, next) => {
   try {
-    const { email, newPassword } = req.body;
+    const { email, otp, newPassword } = req.body;
 
-    if (!email || !newPassword) {
+    if (!email || !otp || !newPassword) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide email and new password',
+        message: 'Please provide email, OTP and new password',
       });
     }
 
@@ -401,8 +401,11 @@ const resetPassword = async (req, res, next) => {
       });
     }
 
+    // The OTP must be re-checked here, otherwise anyone who triggers a reset
+    // for an email could set that account's password without the code.
     const user = await User.findOne({
       email: email.toLowerCase().trim(),
+      resetPasswordOtp: otp.toString().trim(),
       resetPasswordExpires: { $gt: Date.now() },
     });
 

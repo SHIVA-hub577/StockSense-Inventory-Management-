@@ -32,6 +32,24 @@ GOOGLEUSER=your_gmail_address
 GMAIL_APP_PASSWORD=your_gmail_app_password
 JWT_SECRET=your_jwt_secret
 ```
+Copy `.env.example` to `.env` to start. Never commit real values.
+
+#### 🔹 Local Database (no Atlas account needed)
+Stock validation uses MongoDB transactions, which need a replica set. `npm run db` starts one locally (data is kept in `.localdb/`):
+```bash
+npm run db      # keep this terminal open
+```
+Then in `.env`:
+```env
+MONGO_DB_URL=mongodb://127.0.0.1:27017/stocksense?replicaSet=rs0
+```
+If `GOOGLEUSER` / `GMAIL_APP_PASSWORD` are left empty in development, OTP emails are printed to the server console instead of being sent.
+
+#### 🔹 Demo Data & Tests
+```bash
+npm run seed    # wipes inventory data and loads demo warehouses, products, operations + demo logins (see scripts/seed.js)
+npm test        # stock engine tests (uses its own in-memory database)
+```
 
 ### 3️⃣ Step 3: Start the Express Server
 
